@@ -5,19 +5,28 @@ import java.util.Date;
 public class DomainTest {
 	public static void main(String[] args) {
 		Domain domain = setupDomain();
+		Date offerDate = new Date();
 		domain.insertPlain("Property", 
 				"address", "Sofia",
 				"price", 120000,
 				"photo", null,
 				"agent", "agent1",
-				"dateRegistered", new Date());
+				"dateRegistered", offerDate);
 		
 		domain.insertPlain("Offer",
 				"address", "Sofia",
 				"offerPrice", 119000,
-				"offerDate", new Date(),
+				"offerDate", offerDate,
 				"bidderName", "bidder1",
 				"bidderAddress", "bidder1 add");
+		
+		domain.insertPlain("Decision",
+				"address", "Sofia",
+				"offerDate", offerDate,
+				"bidderName", "bidder1",
+				"bidderAddress", "bidder1 add",
+				"decisionDate", new Date(),
+				"accepted", false);
 		
 		domain.insertPlain("Room", 
 				"address", "Sofia",
@@ -34,12 +43,14 @@ public class DomainTest {
 		
 		System.out.println("Property: " + domain.select("Property"));
 		System.out.println("Offer: " + domain.select("Offer"));
+		System.out.println("Decision: " + domain.select("Decision"));
 		System.out.println("Room: " + domain.select("Room"));
 		System.out.println("Floor: " + domain.select("Floor"));
 		
 		System.out.println();
 		System.out.println("RoomInfo: " + domain.select("RoomInfo"));
-		System.out.println("RoomInfo: " + domain.select("RoomInfo"));
+		System.out.println("Acceptance: " + domain.select("Acceptance"));
+		System.out.println("Rejection: " + domain.select("Rejection"));
 	}
 
 	private static Domain setupDomain() {
@@ -146,9 +157,17 @@ public class DomainTest {
 		
 		dom.extend("RoomInfo", "Room", roomSizeAtt);
 		
-		dom.project_away("Acceptance", dom.restrict("Decision", new Condition() {}), "accepted");
+		dom.project_away("Acceptance", dom.restrict("Decision", new Condition() {
+			@Override
+			public boolean satisfied(Entity e) {
+				return (Boolean) e.getValue("accepted");
+			}}), "accepted");
 		
-		dom.project_away("Rejection", dom.restrict("Decision", new Condition() {}), "accepted");
+		dom.project_away("Rejection", dom.restrict("Decision", new Condition() {
+			@Override
+			public boolean satisfied(Entity e) {
+				return ! (Boolean) e.getValue("accepted");
+			}}), "accepted");
 		
 		dom.extend("PropertyInfo", "Property", priceBandAtt, areaCodeAtt, numberOfRoomsAtt, squareFeetAtt);
 		
