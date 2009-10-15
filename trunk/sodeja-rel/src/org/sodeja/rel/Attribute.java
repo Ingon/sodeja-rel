@@ -1,8 +1,8 @@
 package org.sodeja.rel;
 
 public class Attribute implements Comparable<Attribute> {
-	protected final String name;
-	protected final Type type;
+	public final String name;
+	public final Type type;
 	
 	public Attribute(String name, Type type) {
 		this.name = name;

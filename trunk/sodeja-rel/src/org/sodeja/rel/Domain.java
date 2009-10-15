@@ -1,5 +1,6 @@
 package org.sodeja.rel;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -66,7 +67,7 @@ public class Domain {
 	}
 
 	public Relation restrict(String name, Relation relation, Condition... conditions) {
-		return remember(name, new RestrictRelation(name, relation, conditions));
+		return remember(name, new RestrictRelation(name, relation, new HashSet<Condition>(Arrays.asList(conditions))));
 	}
 	
 	public Relation project_away(Relation relation, String... attributes) {

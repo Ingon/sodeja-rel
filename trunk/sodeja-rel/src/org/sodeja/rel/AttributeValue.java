@@ -1,8 +1,8 @@
 package org.sodeja.rel;
 
 public class AttributeValue implements Comparable<AttributeValue> {
-	protected final Attribute attribute;
-	protected final Object value;
+	public final Attribute attribute;
+	public final Object value;
 	
 	public AttributeValue(Attribute attribute, Object value) {
 		this.attribute = attribute;
