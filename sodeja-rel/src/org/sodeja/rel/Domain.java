@@ -118,20 +118,20 @@ public class Domain {
 		return remember(name, new MinusRelation(name, relation, other));
 	}
 	
-	public Relation summarize(String relation, Relation other, Aggregate... aggregates) {
-		return summarize(resolve(relation), other, aggregates);
+	public Relation summarize(String relation, Relation other, Aggregate aggregate) {
+		return summarize(resolve(relation), other, aggregate);
 	}
 	
-	public Relation summarize(Relation relation, Relation other, Aggregate... aggregates) {
-		return summarize(null, relation, other, aggregates);
+	public Relation summarize(Relation relation, Relation other, Aggregate aggregate) {
+		return summarize(null, relation, other, aggregate);
 	}
 	
-	public Relation summarize(String name, String relation, Relation other, Aggregate... aggregates) {
-		return summarize(name, resolve(relation), other, aggregates);
+	public Relation summarize(String name, String relation, Relation other, Aggregate aggregate) {
+		return summarize(name, resolve(relation), other, aggregate);
 	}
 	
-	public Relation summarize(String name, Relation relation, Relation other, Aggregate... aggregates) {
-		return remember(name, new SummarizeRelation(name, relation, other, aggregates));
+	public Relation summarize(String name, Relation relation, Relation other, Aggregate aggregate) {
+		return remember(name, new SummarizeRelation(name, relation, other, aggregate));
 	}
 
 	public void insertPlain(String name, Object... namedValues) {

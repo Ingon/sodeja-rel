@@ -1,24 +1,48 @@
 package org.sodeja.rel;
 
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
+import java.util.Set;
+
+import org.sodeja.collections.CollectionUtils;
+import org.sodeja.functional.Function1;
 
 public class DomainTest {
 	public static void main(String[] args) {
 		Domain domain = setupDomain();
 		Date offerDate = new Date();
 		domain.insertPlain("Property", 
-				"address", "Sofia",
-				"price", 120000,
+				"address", "Sofia, OK",
+				"price", 120000.0,
+				"photo", null,
+				"agent", "agent1",
+				"dateRegistered", offerDate);
+		domain.insertPlain("Property", 
+				"address", "Sofia, ML",
+				"price", 90000.0,
 				"photo", null,
 				"agent", "agent1",
 				"dateRegistered", offerDate);
 		
 		domain.insertPlain("Offer",
 				"address", "Sofia",
-				"offerPrice", 119000,
+				"offerPrice", 119000.0,
 				"offerDate", offerDate,
 				"bidderName", "bidder1",
 				"bidderAddress", "bidder1 add");
+		domain.insertPlain("Offer",
+				"address", "Sofia",
+				"offerPrice", 120000.0,
+				"offerDate", new Date(),
+				"bidderName", "bidder1",
+				"bidderAddress", "bidder1 add");
+		domain.insertPlain("Offer",
+				"address", "Sofia",
+				"offerPrice", 121000.0,
+				"offerDate", offerDate,
+				"bidderName", "bidder2",
+				"bidderAddress", "bidder2 add");
 		
 		domain.insertPlain("Decision",
 				"address", "Sofia",
@@ -27,6 +51,14 @@ public class DomainTest {
 				"bidderAddress", "bidder1 add",
 				"decisionDate", new Date(),
 				"accepted", false);
+		
+		domain.insertPlain("Decision",
+				"address", "Sofia",
+				"offerDate", offerDate,
+				"bidderName", "bidder2",
+				"bidderAddress", "bidder2 add",
+				"decisionDate", new Date(),
+				"accepted", true);
 		
 		domain.insertPlain("Room", 
 				"address", "Sofia",
@@ -46,15 +78,23 @@ public class DomainTest {
 		System.out.println("Decision: " + domain.select("Decision"));
 		System.out.println("Room: " + domain.select("Room"));
 		System.out.println("Floor: " + domain.select("Floor"));
-		
 		System.out.println();
+		
 		System.out.println("RoomInfo: " + domain.select("RoomInfo"));
+		System.out.println();
+		
 		System.out.println("Acceptance: " + domain.select("Acceptance"));
 		System.out.println("Rejection: " + domain.select("Rejection"));
+		System.out.println();
+		
+		System.out.println("PropertyInfo: " + domain.select("PropertyInfo"));
+		System.out.println();
+		
+		System.out.println("CurrentOffer: " + domain.select("CurrentOffer"));
 	}
 
 	private static Domain setupDomain() {
-		Domain dom = new Domain();
+		final Domain dom = new Domain();
 		
 		Type address = dom.alias(Types.STRING);
 		Type agent = dom.alias(Types.STRING);
@@ -132,22 +172,53 @@ public class DomainTest {
 		CalculatedAttribute priceBandAtt = new CalculatedAttribute("priceBand", priceBand) {
 			@Override
 			public Object calculate(Entity entity) {
-				throw new UnsupportedOperationException();
+				double price = (Double) entity.getValue("price");
+				if(price < 50000) {
+					return PriceBand.LOW;
+				} else if(price < 75000) {
+					return PriceBand.MEDIUM;
+				} else if(price < 100000) {
+					return PriceBand.HIGH;
+				} else {
+					return PriceBand.PREMIUM;
+				}
 			}};
 		CalculatedAttribute areaCodeAtt = new CalculatedAttribute("areaCode", areaCode) {
 			@Override
 			public Object calculate(Entity entity) {
-				throw new UnsupportedOperationException();
+				String address = (String) entity.getValue("address");
+				if(address.startsWith("Sofia")) {
+					return AreaCode.CITY;
+				} else {
+					return AreaCode.SUBURBAN;
+				}
 			}};
 		CalculatedAttribute numberOfRoomsAtt = new CalculatedAttribute("numberOfRooms", Types.INT) {
 			@Override
 			public Object calculate(Entity entity) {
-				throw new UnsupportedOperationException();
+				final String address = (String) entity.getValue("address");
+				return dom.restrict("RoomInfo", new Condition() {
+					@Override
+					public boolean satisfied(Entity e) {
+						String iaddress = (String) e.getValue("address");
+						return address.equals(iaddress);
+					}}).select().size();
 			}};
 		CalculatedAttribute squareFeetAtt = new CalculatedAttribute("squareFeet", Types.DOUBLE) {
 			@Override
 			public Object calculate(Entity entity) {
-				throw new UnsupportedOperationException();
+				final String address = (String) entity.getValue("address");
+				Set<Entity> result = dom.restrict("RoomInfo", new Condition() {
+					@Override
+					public boolean satisfied(Entity e) {
+						String iaddress = (String) e.getValue("address");
+						return address.equals(iaddress);
+					}}).select();
+				return CollectionUtils.sumDouble(result, new Function1<Double, Entity>() {
+					@Override
+					public Double execute(Entity p) {
+						return (Double) p.getValue("roomSize");
+					}});
 			}};
 		CalculatedAttribute saleSpeedAtt = new CalculatedAttribute("saleSpeed", speedBand) {
 			@Override
@@ -171,7 +242,17 @@ public class DomainTest {
 		
 		dom.extend("PropertyInfo", "Property", priceBandAtt, areaCodeAtt, numberOfRoomsAtt, squareFeetAtt);
 		
-		dom.summarize("CurrentOffer", "Offer", dom.project("Offer", "address", "bidderName", "bidderAddress"), new Aggregate() {});
+		dom.summarize("CurrentOffer", "Offer", dom.project("Offer", "address", "bidderName", "bidderAddress"), new Aggregate() {
+			@Override
+			public Entity aggregate(Set<Entity> entities) {
+				return Collections.max(entities, new Comparator<Entity>() {
+					@Override
+					public int compare(Entity o1, Entity o2) {
+						Date d1 = (Date) o1.getValue("offerDate");
+						Date d2 = (Date) o2.getValue("offerDate");
+						return d1.compareTo(d2);
+					}});
+			}});
 		
 		dom.project_away("RawSales", dom.join("Acceptance", 
 				dom.join("CurrentOffer", dom.project("Property", "address", "agent", "dateRegistered"))),
@@ -194,7 +275,11 @@ public class DomainTest {
 		
 		dom.project("PropertyForWebSite", dom.join("UnsoldProperty", "PropertyInfo"), "address", "price", "photo", "numberOfRooms", "squareFeet");
 		
-		dom.project("CommissionDue", dom.summarize("SalesCommissions", dom.project("SalesCommissions", "agent"), new Aggregate() {}), "agent", "totalCommission");
+		dom.project("CommissionDue", dom.summarize("SalesCommissions", dom.project("SalesCommissions", "agent"), new Aggregate() {
+			@Override
+			public Entity aggregate(Set<Entity> entities) {
+				throw new UnsupportedOperationException();
+			}}), "agent", "totalCommission");
 		
 		return dom;
 	}
