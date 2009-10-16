@@ -17,10 +17,27 @@ import org.sodeja.rel.relations.RestrictRelation;
 import org.sodeja.rel.relations.SummarizeRelation;
 
 public class Domain {
-	private final Map<String, Relation> relations;
+	private final Map<String, Relation> relations = new HashMap<String, Relation>();
+	private final Map<String, IntegrityCheck> checks = new HashMap<String, IntegrityCheck>();
+	protected final TransactionManager manager = new TransactionManager();
 	
 	public Domain() {
-		relations = new HashMap<String, Relation>();
+	}
+	
+	public void addCheck(String name, IntegrityCheck cond) {
+		checks.put(name, cond);
+	}
+	
+	public void removeCheck(String name) {
+		checks.remove(name);
+	}
+	
+	protected void performChecks() {
+		for(Map.Entry<String, IntegrityCheck> check : checks.entrySet()) {
+			if(! check.getValue().perform()) {
+				throw new ConstraintViolationException("Integrity constraint \"" + check.getKey() + "\" failed");
+			}
+		}
 	}
 	
 	public Type alias(Type type) {
@@ -55,7 +72,7 @@ public class Domain {
 	}
 	
 	public BaseRelation relation(String name, Attribute... attributes) {
-		return remember(name, new BaseRelation(name, attributes));
+		return remember(name, new BaseRelation(this, name, attributes));
 	}
 
 	public Relation extend(String relation, CalculatedAttribute... attributes) {
@@ -146,6 +163,24 @@ public class Domain {
 		return remember(name, new SummarizeRelation(name, relation, other, aggregate));
 	}
 
+	public void begin() {
+		manager.begin();
+	}
+	
+	public void commit() {
+		try {
+			performChecks();
+			manager.commit();
+		} catch(RuntimeException e) {
+			manager.rollback();
+			throw e;
+		}
+	}
+	
+	public void rollback() {
+		manager.rollback();
+	}
+	
 	public void insertPlain(String name, Object... namedValues) {
 		Set<Pair<String, Object>> values = new HashSet<Pair<String,Object>>();
 		for(int i = 0; i < namedValues.length; i+=2) {
