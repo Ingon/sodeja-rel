@@ -14,7 +14,8 @@ public class Entity {
 	}
 
 	public Object getValue(String attribute) {
-		return getAttributeValue(attribute).value;
+		AttributeValue val = getAttributeValue(attribute);
+		return val != null ? val.value : null;
 	}
 	
 	public Set<AttributeValue> getValues() {
@@ -27,7 +28,7 @@ public class Entity {
 				return value;
 			}
 		}
-		throw new RuntimeException();
+		return null;
 	}
 	
 	@Override

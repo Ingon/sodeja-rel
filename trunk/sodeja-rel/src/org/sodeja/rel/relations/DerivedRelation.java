@@ -13,9 +13,4 @@ public abstract class DerivedRelation implements Relation {
 		this.name = name;
 		this.relation = relation;
 	}
-
-	@Override
-	public Set<Entity> select() {
-		throw new UnsupportedOperationException();
-	}
 }

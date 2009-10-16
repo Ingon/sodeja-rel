@@ -39,7 +39,7 @@ public class SummarizeRelation extends DerivedRelation {
 		
 		Set<Entity> result = new HashSet<Entity>();
 		for(Map.Entry<Entity, Set<Entity>> g : groups.entrySet()) {
-			result.add(aggregate.aggregate(g.getValue()));
+			result.add(aggregate.aggregate(g.getKey(), g.getValue()));
 		}
 		return result;
 	}
