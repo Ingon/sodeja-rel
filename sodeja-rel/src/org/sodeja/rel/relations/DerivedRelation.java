@@ -1,8 +1,5 @@
 package org.sodeja.rel.relations;
 
-import java.util.Set;
-
-import org.sodeja.rel.Entity;
 import org.sodeja.rel.Relation;
 
 public abstract class DerivedRelation implements Relation {
