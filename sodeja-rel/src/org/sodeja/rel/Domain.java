@@ -171,7 +171,7 @@ public class Domain {
 		try {
 			performChecks();
 			manager.commit();
-		} catch(RuntimeException e) {
+		} catch(ConstraintViolationException e) {
 			manager.rollback();
 			throw e;
 		}

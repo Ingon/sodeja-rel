@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.UUID;
 
 import org.sodeja.collections.CollectionUtils;
 import org.sodeja.functional.Function1;
@@ -18,19 +19,18 @@ public class BaseRelation implements Relation {
 	protected final Domain domain;
 	protected final String name;
 	protected final Set<Attribute> attributes;
+	protected final UUIDGenerator idGen = new UUIDGenerator();
 	
 	protected Set<Attribute> pk = new TreeSet<Attribute>();
 	protected Map<BaseRelation, Set<Attribute>> fks = new HashMap<BaseRelation, Set<Attribute>>();
 	protected Set<BaseRelation> references = new HashSet<BaseRelation>();
 
-//	protected Set<Entity> entities = new HashSet<Entity>();
-	
 	protected BaseRelation(Domain domain, String name, Attribute... attributes) {
 		this.domain = domain;
 		this.name = name;
 		this.attributes = new TreeSet<Attribute>(Arrays.asList(attributes));
 		
-		this.domain.manager.set(this, Collections.<Entity>emptySet());
+		setEntities(Collections.<BaseEntity>emptySet(), Collections.<UUID>emptySet());
 	}
 	
 	public BaseRelation primaryKey(String... attributeNames) {
@@ -61,13 +61,30 @@ public class BaseRelation implements Relation {
 	}
 	
 	public void insert(Set<Pair<String, Object>> attributeValues) {
-		Entity e = new Entity(extractValues(attributeValues));
+		BaseEntity e = new BaseEntity(idGen.next(), extractValues(attributeValues));
 		checkPrimaryKey(e);
 		checkForeignKeys(e);
 		
-		Set<Entity> newValues = new HashSet<Entity>(getEntities());
+		Set<BaseEntity> newValues = new HashSet<BaseEntity>(getEntities());
 		newValues.add(e);
-		setEntities(newValues);
+		setEntities(newValues, Collections.<UUID>emptySet());
+	}
+
+	public void update(Set<Pair<String, Object>> attributeValues, Condition cond) {
+		Set<BaseEntity> entities = new HashSet<BaseEntity>();
+		Set<UUID> delta = new HashSet<UUID>();
+		for(BaseEntity e : getEntities()) {
+			if(cond.satisfied(e)) {
+				e = new BaseEntity(e.id, merge(e, attributeValues));
+				delta.add(e.id);
+			}
+			entities.add(e);
+		}
+		setEntities(entities, delta);
+	}
+	
+	private Set<AttributeValue> merge(BaseEntity e, Set<Pair<String, Object>> attributeValues) {
+		return null;
 	}
 
 	public void delete(Set<Pair<String, Object>> attributeValues) {
@@ -86,15 +103,17 @@ public class BaseRelation implements Relation {
 	}
 	
 	public void delete(Condition cond) {
-		Set<Entity> entities = new HashSet<Entity>();
-		for(Entity e : getEntities()) {
+		Set<BaseEntity> entities = new HashSet<BaseEntity>();
+		Set<UUID> delta = new HashSet<UUID>();
+		for(BaseEntity e : getEntities()) {
 			if(cond.satisfied(e)) {
 				checkDeletion(e);
+				delta.add(e.id);
 			} else {
 				entities.add(e);
 			}
 		}
-		setEntities(entities);
+		setEntities(entities, delta);
 	}
 	
 	private void checkDeletion(Entity e) {
@@ -141,7 +160,7 @@ public class BaseRelation implements Relation {
 
 	@Override
 	public Set<Entity> select() {
-		return Collections.unmodifiableSet(getEntities());
+		return Collections.<Entity>unmodifiableSet(getEntities());
 	}
 	
 	private Entity extract(Entity e, Set<Attribute> attributes) {
@@ -165,12 +184,12 @@ public class BaseRelation implements Relation {
 		return null;
 	}
 
-	private Set<Entity> getEntities() {
+	private Set<BaseEntity> getEntities() {
 		return domain.manager.get(this);
 	}
 	
-	private void setEntities(Set<Entity> entities) {
-		domain.manager.set(this, Collections.unmodifiableSet(entities));
+	private void setEntities(Set<BaseEntity> entities, Set<UUID> delta) {
+		domain.manager.set(this, Collections.unmodifiableSet(entities), delta);
 	}
 	
 	private Function1<Attribute, String> attributeFinder = new Function1<Attribute, String>() {

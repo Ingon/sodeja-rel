@@ -11,7 +11,7 @@ import org.sodeja.functional.Function1;
 
 public class DomainTest {
 	public static void main(String[] args) {
-		Domain domain = setupDomain();
+		final Domain domain = setupDomain();
 		
 		domain.begin();
 		
@@ -85,6 +85,13 @@ public class DomainTest {
 				"type", RoomType.LIVING_ROOM
 				);
 		domain.insertPlain("Room", 
+				"address", "Sofia, OK",
+				"roomName", "Supp",
+				"width", 5.0,
+				"breadth", 5.0,
+				"type", RoomType.LIVING_ROOM
+				);
+		domain.insertPlain("Room", 
 				"address", "Sofia, ML",
 				"roomName", "Main",
 				"width", 5.0,
@@ -147,6 +154,51 @@ public class DomainTest {
 			System.out.println("Rolledback");
 		}
 		System.out.println("Property: " + domain.select("Property"));
+		
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				domain.begin();
+				try {
+					Thread.currentThread().sleep(1000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+//				domain.insertPlain("Room", 
+//						"address", "Sofia, OK",
+//						"roomName", "Third",
+//						"width", 5.0,
+//						"breadth", 5.0,
+//						"type", RoomType.LIVING_ROOM
+//						);
+				domain.deletePlain("Room", "roomName", "Supp");
+				try {
+					domain.commit();
+				} catch(RollbackException exc) {
+					System.out.println("Not Properly rolledback");
+				}
+			}
+		}).start();
+		
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				domain.begin();
+//				domain.insertPlain("Room", 
+//						"address", "Sofia, OK",
+//						"roomName", "Third",
+//						"width", 5.0,
+//						"breadth", 5.0,
+//						"type", RoomType.LIVING_ROOM
+//						);
+				domain.deletePlain("Room", "roomName", "Supp");
+				try {
+					domain.commit();
+				} catch(RollbackException exc) {
+					System.out.println("Properly rolledback");
+				}
+			}
+		}).start();
 		
 //		System.out.println();
 //		System.out.println();
