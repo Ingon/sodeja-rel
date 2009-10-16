@@ -3,6 +3,7 @@ package org.sodeja.rel;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -19,6 +20,7 @@ public class BaseRelation implements Relation {
 	
 	protected Set<Attribute> pk = new TreeSet<Attribute>();
 	protected Map<BaseRelation, Set<Attribute>> fks = new HashMap<BaseRelation, Set<Attribute>>();
+	protected Set<BaseRelation> references = new HashSet<BaseRelation>();
 
 	protected Set<Entity> entities = new HashSet<Entity>();
 	
@@ -34,9 +36,7 @@ public class BaseRelation implements Relation {
 	
 	public BaseRelation foreignKey(BaseRelation target, String... attributeNames) {
 		Set<Attribute> candidateFk = resolveAttributes(attributeNames);
-		if(! target.pk.equals(candidateFk)) {
-			throw new ConstraintViolationException("Foreign key set is not refering to primary key");
-		}
+		target.reference(this, candidateFk);
 		fks.put(target, candidateFk);
 		return this;
 	}
@@ -49,6 +49,13 @@ public class BaseRelation implements Relation {
 		return att;
 	}
 
+	private void reference(BaseRelation source, Set<Attribute> candidateFk) {
+		if(! this.pk.equals(candidateFk)) {
+			throw new ConstraintViolationException("Foreign key set is not refering to primary key");
+		}
+		references.add(source);
+	}
+	
 	public void insert(Set<Pair<String, Object>> attributeValues) {
 		Entity e = new Entity(extractValues(attributeValues));
 		checkPrimaryKey(e);
@@ -56,9 +63,47 @@ public class BaseRelation implements Relation {
 		entities.add(e);
 	}
 
+	public void delete(Set<Pair<String, Object>> attributeValues) {
+		final Entity example = new Entity(extractValues(attributeValues));
+		delete(new Condition() {
+			@Override
+			public boolean satisfied(Entity e) {
+				for(AttributeValue v : example.values) {
+					if(! ObjectUtils.equalsIfNull(v.value, e.getAttributeValue(v.attribute).value)) {
+						return false;
+					}
+				}
+				return true;
+			}
+		});
+	}
+	
+	public void delete(Condition cond) {
+		for(Iterator<Entity> ite = entities.iterator(); ite.hasNext(); ) {
+			Entity e = ite.next();
+			if(cond.satisfied(e)) {
+				checkDeletion(e);
+				ite.remove();
+			}
+		}
+	}
+	
+	private void checkDeletion(Entity e) {
+		for(BaseRelation rel : references) {
+			Entity pkEntity = extract(e, pk);
+			if(rel.refer(pkEntity)) {
+				throw new ConstraintViolationException("Foreign key from " + rel.name + " relation violated");
+			}
+		}
+	}
+
+	private boolean refer(Entity pkEntity) {
+		return selectByKey(pkEntity) != null;
+	}
+
 	private void checkPrimaryKey(Entity e) {
 		Entity pkEntity = extract(e, pk);
-		if(selectByPk(pkEntity) != null) {
+		if(selectByKey(pkEntity) != null) {
 			throw new ConstraintViolationException("Primary key constraint violated");
 		}
 	}
@@ -66,7 +111,7 @@ public class BaseRelation implements Relation {
 	private void checkForeignKeys(Entity e) {
 		for(Map.Entry<BaseRelation, Set<Attribute>> rel : fks.entrySet()) {
 			Entity fkEntity = extract(e, rel.getValue());
-			if(rel.getKey().selectByPk(fkEntity) == null) {
+			if(rel.getKey().selectByKey(fkEntity) == null) {
 				throw new ConstraintViolationException("Foreign key to " + rel.getKey().name + " violated");
 			}
 		}
@@ -98,7 +143,7 @@ public class BaseRelation implements Relation {
 		return new Entity(pkValues);
 	}
 
-	protected Entity selectByPk(Entity pk) {
+	protected Entity selectByKey(Entity pk) {
 		OUTER: for(Entity e : entities) {
 			for(AttributeValue pkVal : pk.getValues()) {
 				Object eval = e.getValue(pkVal.attribute.name);
