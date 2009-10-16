@@ -35,7 +35,7 @@ public class DomainTest {
 		domain.insertPlain("Offer",
 				"address", "Sofia, OK",
 				"offerPrice", 120000.0,
-				"offerDate", new Date(),
+				"offerDate", new Date(System.currentTimeMillis() - 10000),
 				"bidderName", "bidder1",
 				"bidderAddress", "bidder1 add");
 		domain.insertPlain("Offer",
@@ -156,7 +156,7 @@ public class DomainTest {
 				new Attribute("bidderName", name),
 				new Attribute("bidderAddress", address))
 				.primaryKey("address", "offerDate", "bidderName", "bidderAddress")
-				.foreignKey(dom.resolve("Property"), "address");
+				.foreignKey(dom.resolveBase("Property"), "address");
 		
 		dom.relation("Decision",
 				new Attribute("address", address),
@@ -166,7 +166,7 @@ public class DomainTest {
 				new Attribute("decisionDate", Types.DATE),
 				new Attribute("accepted", Types.BOOL))
 				.primaryKey("address", "offerDate", "bidderName", "bidderAddress")
-				.foreignKey(dom.resolve("Offer"), "address", "offerDate", "bidderName", "bidderAddress");
+				.foreignKey(dom.resolveBase("Offer"), "address", "offerDate", "bidderName", "bidderAddress");
 
 		dom.relation("Room",
 				new Attribute("address", address),
@@ -175,14 +175,14 @@ public class DomainTest {
 				new Attribute("breadth", Types.DOUBLE),
 				new Attribute("type", roomType))
 				.primaryKey("address", "roomName")
-				.foreignKey(dom.resolve("Property"), "address");
+				.foreignKey(dom.resolveBase("Property"), "address");
 
 		dom.relation("Floor",
 				new Attribute("address", address),
 				new Attribute("roomName", Types.STRING),
 				new Attribute("floor", Types.INT))
 				.primaryKey("address", "roomName")
-				.foreignKey(dom.resolve("Property"), "address");
+				.foreignKey(dom.resolveBase("Property"), "address");
 		
 		dom.relation("Commission",
 				new Attribute("priceBand", priceBand),

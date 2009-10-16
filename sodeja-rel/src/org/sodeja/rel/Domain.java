@@ -32,7 +32,19 @@ public class Domain {
 	}
 	
 	public Relation resolve(String name) {
-		return relations.get(name);
+		Relation rel = relations.get(name);
+		if(rel == null) {
+			throw new RuntimeException("Relation " + name + " not found in the domain");
+		}
+		return rel;
+	}
+	
+	public BaseRelation resolveBase(String name) {
+		Relation rel = resolve(name);
+		if(! (rel instanceof BaseRelation)) {
+			throw new RuntimeException("Relation " + name + " is not base in the domain");
+		}
+		return (BaseRelation) rel;
 	}
 	
 	private <T extends Relation> T remember(String name, T relation) {
@@ -143,11 +155,7 @@ public class Domain {
 	}
 	
 	public void insert(String name, Set<Pair<String, Object>> attributeValues) {
-		Relation relation = resolve(name);
-		if(! (relation instanceof BaseRelation)) {
-			throw new UnsupportedOperationException();
-		}
-		((BaseRelation) relation).insert(attributeValues);
+		resolveBase(name).insert(attributeValues);
 	}
 
 	public Set<Entity> select(String name) {

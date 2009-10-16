@@ -6,4 +6,9 @@ class EnumType implements Type {
 	protected EnumType(Class<?> internal) {
 		this.internal = internal;
 	}
+
+	@Override
+	public boolean accepts(Object o) {
+		return internal == o.getClass();
+	}
 }
