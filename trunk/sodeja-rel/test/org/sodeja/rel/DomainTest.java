@@ -75,6 +75,13 @@ public class DomainTest {
 				"type", RoomType.LIVING_ROOM
 				);
 		domain.insertPlain("Room", 
+				"address", "Sofia, OK",
+				"roomName", "Second",
+				"width", 5.0,
+				"breadth", 5.0,
+				"type", RoomType.LIVING_ROOM
+				);
+		domain.insertPlain("Room", 
 				"address", "Sofia, ML",
 				"roomName", "Main",
 				"width", 5.0,
@@ -90,6 +97,8 @@ public class DomainTest {
 				"address", "Sofia, ML",
 				"roomName", "Main",
 				"floor", 1);
+		
+		domain.deletePlain("Room", "roomName", "Second");
 		
 		domain.insertPlain("Commission",
 				"priceBand", PriceBand.PREMIUM,
@@ -182,7 +191,8 @@ public class DomainTest {
 				new Attribute("roomName", Types.STRING),
 				new Attribute("floor", Types.INT))
 				.primaryKey("address", "roomName")
-				.foreignKey(dom.resolveBase("Property"), "address");
+				.foreignKey(dom.resolveBase("Property"), "address")
+				.foreignKey(dom.resolveBase("Room"), "address", "roomName");
 		
 		dom.relation("Commission",
 				new Attribute("priceBand", priceBand),

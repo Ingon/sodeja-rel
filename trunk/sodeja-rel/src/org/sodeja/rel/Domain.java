@@ -161,4 +161,20 @@ public class Domain {
 	public Set<Entity> select(String name) {
 		return resolve(name).select();
 	}
+	
+	public void deletePlain(String name, Object... namedValues) {
+		Set<Pair<String, Object>> values = new HashSet<Pair<String,Object>>();
+		for(int i = 0; i < namedValues.length; i+=2) {
+			values.add(Pair.of((String) namedValues[i], namedValues[i + 1]));
+		}
+		delete(name, values);
+	}
+	
+	public void delete(String name, Set<Pair<String, Object>> attributeValues) {
+		resolveBase(name).delete(attributeValues);
+	}
+
+	public void delete(String name, Condition cond) {
+		resolveBase(name).delete(cond);
+	}
 }
