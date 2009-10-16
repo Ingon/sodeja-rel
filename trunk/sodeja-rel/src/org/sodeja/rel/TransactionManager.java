@@ -1,67 +1,161 @@
 package org.sodeja.rel;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicReference;
 
 class TransactionManager {
-	private AtomicReference<TransactionInfo> currentInfo = new AtomicReference<TransactionInfo>();
-	private ThreadLocal<TransactionInfo> state = new ThreadLocal<TransactionInfo>();
+	private final AtomicReference<Version> versionRef;
+	private final ThreadLocal<TransactionInfo> state = new ThreadLocal<TransactionInfo>();
+	private final ConcurrentLinkedQueue<TransactionInfo> order = new ConcurrentLinkedQueue<TransactionInfo>();
+	private final UUIDGenerator idGen = new UUIDGenerator();
 	
 	protected TransactionManager() {
-		currentInfo.set(new TransactionInfo(null, 0, new HashMap<BaseRelation, Set<Entity>>()));
+		versionRef = new AtomicReference<Version>(new Version(idGen.next(), new HashMap<BaseRelation, Set<BaseEntity>>(), new HashMap<BaseRelation, Set<UUID>>(), null));
 	}
 	
 	public void begin() {
-		state.set(new TransactionInfo(currentInfo.get()));
+		state.set(new TransactionInfo(versionRef.get()));
+		order.offer(state.get());
 	}
 	
 	public void commit() {
 		TransactionInfo info = state.get();
-		currentInfo.compareAndSet(info.parent, info);
+		if(info == null) {
+			throw new RuntimeException("No transaction");
+		}
+		if(info.rolledback) {
+			throw new RollbackException("Already rolledback");
+		}
+		if(info.delta.size() == 0) { // Only reads
+			state.remove();
+		}
+		if(order.peek() != info) { // if we are not the head, wait for it
+			synchronized(info) { 
+				try {
+					info.wait();
+				} catch (InterruptedException e) {
+					e.printStackTrace(); // Hmmm ? rollback?
+				} 
+			}
+		}
+		
+		UUID verId = idGen.next();
+		boolean result = versionRef.compareAndSet(info.version, new Version(verId, info.values, info.delta, info.version));
+		if(! result) {
+			Version ver = versionRef.get();
+			if(isTouched(ver, info)) {
+				rollback();
+				throw new RollbackException("");
+			}
+			result = versionRef.compareAndSet(ver, new Version(verId, info.values, info.delta, ver));
+		}
+		
+		order.remove(info);
 		state.remove();
+		
+		TransactionInfo nextInfo = null;
+		while((nextInfo = order.peek()) != null && nextInfo.rolledback) {
+			order.poll();
+		}
+		if(nextInfo != null) {
+			synchronized (nextInfo) {
+				nextInfo.notify();
+			}
+		}
 	}
 	
+	private boolean isTouched(Version ver, TransactionInfo info) { // Poor naming - idea is to check delta on all versions till our version for modifications of same entities
+		Version curr = ver;
+		while(curr != info.version) {
+			if(checkDiff(curr.delta, info.delta)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private boolean checkDiff(Map<BaseRelation, Set<UUID>> target, Map<BaseRelation, Set<UUID>> current) {
+		for(Map.Entry<BaseRelation, Set<UUID>> c : current.entrySet()) {
+			Set<UUID> tdelta = target.get(c.getKey());
+			if(tdelta == null) {
+				continue;
+			}
+			
+			Set<UUID> cdelta = c.getValue();
+			for(UUID id : cdelta) {
+				if(tdelta.contains(id)) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
 	public void rollback() {
-		state.remove();
+		TransactionInfo info = state.get();
+		info.rolledback = true;
+		order.remove(info);
+//		state.remove();
 	}
 	
-	protected Set<Entity> get(BaseRelation key) {
-		Map<BaseRelation, Set<Entity>> currentValues = getMap();
-		return currentValues.get(key);
+	protected Set<BaseEntity> get(BaseRelation key) {
+		ValuesDelta info = getInfo();
+		return info.values.get(key);
 	}
 
-	protected void set(BaseRelation key, Set<Entity> value) {
-		Map<BaseRelation, Set<Entity>> currentValues = getMap();
-		currentValues.put(key, value);
+	protected void set(BaseRelation key, Set<BaseEntity> value, Set<UUID> delta) {
+		ValuesDelta info = getInfo();
+		info.values.put(key, value);
+		
+		Set<UUID> merged = new HashSet<UUID>(delta);
+		Set<UUID> prevDelta = info.delta.get(key);
+		if(prevDelta != null) {
+			merged.addAll(prevDelta);
+		}
+		info.delta.put(key, delta);
 	}
 
-	private Map<BaseRelation, Set<Entity>> getMap() {
+	private ValuesDelta getInfo() {
 		TransactionInfo transactionInfo = state.get();
-		if(transactionInfo == null) {
-			return currentInfo.get().currentValues;
+		if(transactionInfo != null && transactionInfo.rolledback) {
+			throw new RollbackException("Transaction already rolledback");
 		}
-		Map<BaseRelation, Set<Entity>> currentValues = transactionInfo.currentValues;
-		if(currentValues == null) {
-			currentValues = currentInfo.get().currentValues;
-		}
-		return currentValues;
+		return transactionInfo != null ? transactionInfo : versionRef.get();
 	}
 	
-	private class TransactionInfo {
-		protected final TransactionInfo parent;
-		protected final long lastCommitDate;
-		protected final Map<BaseRelation, Set<Entity>> currentValues;
+	private abstract class ValuesDelta {
+		protected final Map<BaseRelation, Set<BaseEntity>> values;
+		protected final Map<BaseRelation, Set<UUID>> delta;
 		
-		public TransactionInfo(TransactionInfo other) {
-			this(other, other.lastCommitDate, new HashMap<BaseRelation, Set<Entity>>(other.currentValues));
+		public ValuesDelta(Map<BaseRelation, Set<BaseEntity>> values, Map<BaseRelation, Set<UUID>> delta) {
+			this.values = values;
+			this.delta = delta;
 		}
+	}
+	
+	private class TransactionInfo extends ValuesDelta {
+		protected final Version version;
+		protected boolean rolledback;
 		
-		public TransactionInfo(TransactionInfo other, long commitDate, Map<BaseRelation, Set<Entity>> currentValues) {
-			this.parent = other;
-			this.lastCommitDate = commitDate;
-			this.currentValues = currentValues;
+		public TransactionInfo(Version version) {
+			super(new HashMap<BaseRelation, Set<BaseEntity>>(version.values), new HashMap<BaseRelation, Set<UUID>>());
+			this.version = version;
+		}
+	}
+	
+	private class Version extends ValuesDelta {
+		protected final UUID id;
+		protected final Version previous;
+		
+		public Version(UUID id, Map<BaseRelation, Set<BaseEntity>> values, Map<BaseRelation, Set<UUID>> delta, Version previous) {
+			super(values, delta);
+			this.id = id;
+			this.previous = previous;
 		}
 	}
 }

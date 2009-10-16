@@ -1,7 +1,7 @@
 package org.sodeja.rel.relations;
 
+import java.util.HashSet;
 import java.util.Set;
-import java.util.TreeSet;
 
 import org.sodeja.collections.CollectionUtils;
 import org.sodeja.functional.Predicate1;
@@ -20,7 +20,7 @@ public class RestrictRelation extends DerivedRelation {
 	@Override
 	public Set<Entity> select() {
 		Set<Entity> entities = relation.select();
-		return (Set<Entity>) CollectionUtils.filter(entities, new TreeSet<Entity>(), new Predicate1<Entity>() {
+		return (Set<Entity>) CollectionUtils.filter(entities, new HashSet<Entity>(), new Predicate1<Entity>() {
 			@Override
 			public Boolean execute(Entity p) {
 				// SetUtils.all
