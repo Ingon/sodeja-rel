@@ -4,6 +4,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.Set;
+import java.util.TreeSet;
 
 import org.sodeja.collections.CollectionUtils;
 import org.sodeja.functional.Function1;
@@ -26,26 +27,32 @@ public class DomainTest {
 				"dateRegistered", offerDate);
 		
 		domain.insertPlain("Offer",
-				"address", "Sofia",
+				"address", "Sofia, OK",
 				"offerPrice", 119000.0,
 				"offerDate", offerDate,
 				"bidderName", "bidder1",
 				"bidderAddress", "bidder1 add");
 		domain.insertPlain("Offer",
-				"address", "Sofia",
+				"address", "Sofia, OK",
 				"offerPrice", 120000.0,
 				"offerDate", new Date(),
 				"bidderName", "bidder1",
 				"bidderAddress", "bidder1 add");
 		domain.insertPlain("Offer",
-				"address", "Sofia",
+				"address", "Sofia, OK",
 				"offerPrice", 121000.0,
+				"offerDate", offerDate,
+				"bidderName", "bidder2",
+				"bidderAddress", "bidder2 add");
+		domain.insertPlain("Offer",
+				"address", "Sofia, ML",
+				"offerPrice", 89000.0,
 				"offerDate", offerDate,
 				"bidderName", "bidder2",
 				"bidderAddress", "bidder2 add");
 		
 		domain.insertPlain("Decision",
-				"address", "Sofia",
+				"address", "Sofia, OK",
 				"offerDate", offerDate,
 				"bidderName", "bidder1",
 				"bidderAddress", "bidder1 add",
@@ -53,7 +60,7 @@ public class DomainTest {
 				"accepted", false);
 		
 		domain.insertPlain("Decision",
-				"address", "Sofia",
+				"address", "Sofia, OK",
 				"offerDate", offerDate,
 				"bidderName", "bidder2",
 				"bidderAddress", "bidder2 add",
@@ -61,17 +68,34 @@ public class DomainTest {
 				"accepted", true);
 		
 		domain.insertPlain("Room", 
-				"address", "Sofia",
+				"address", "Sofia, OK",
 				"roomName", "Main",
 				"width", 5.0,
 				"breadth", 5.0,
 				"type", RoomType.LIVING_ROOM
 				);
+		domain.insertPlain("Room", 
+				"address", "Sofia, ML",
+				"roomName", "Main",
+				"width", 5.0,
+				"breadth", 5.0,
+				"type", RoomType.LIVING_ROOM
+		);
 		
 		domain.insertPlain("Floor",
-				"address", "Sofia",
+				"address", "Sofia, OK",
 				"roomName", "Main",
 				"floor", 1);
+		domain.insertPlain("Floor",
+				"address", "Sofia, ML",
+				"roomName", "Main",
+				"floor", 1);
+		
+		domain.insertPlain("Commission",
+				"priceBand", PriceBand.PREMIUM,
+				"areaCode", AreaCode.CITY,
+				"saleSpeed", SpeedBand.MEDIUM,
+				"commission", 3000.0);
 		
 		System.out.println("Property: " + domain.select("Property"));
 		System.out.println("Offer: " + domain.select("Offer"));
@@ -81,16 +105,24 @@ public class DomainTest {
 		System.out.println();
 		
 		System.out.println("RoomInfo: " + domain.select("RoomInfo"));
-		System.out.println();
-		
 		System.out.println("Acceptance: " + domain.select("Acceptance"));
 		System.out.println("Rejection: " + domain.select("Rejection"));
-		System.out.println();
-		
 		System.out.println("PropertyInfo: " + domain.select("PropertyInfo"));
+		System.out.println("CurrentOffer: " + domain.select("CurrentOffer"));
+		System.out.println("RawSales: " + domain.select("RawSales"));
+		System.out.println("SoldProperty: " + domain.select("SoldProperty"));
+		System.out.println("UnsoldProperty: " + domain.select("UnsoldProperty"));
+		System.out.println("SalesInfo: " + domain.select("SalesInfo"));
+		System.out.println("SalesCommissions: " + domain.select("SalesCommissions"));
 		System.out.println();
 		
-		System.out.println("CurrentOffer: " + domain.select("CurrentOffer"));
+		System.out.println("OpenOffers: " + domain.select("OpenOffers"));
+		System.out.println("PropertyForWebSite: " + domain.select("PropertyForWebSite"));
+		System.out.println("CommissionDue: " + domain.select("CommissionDue"));
+		
+//		System.out.println();
+//		System.out.println();
+//		System.out.println(domain.join("CurrentOffer", domain.project("Property", "address", "agent", "dateRegistered")).select());
 	}
 
 	private static Domain setupDomain() {
@@ -169,10 +201,24 @@ public class DomainTest {
 				double breadth = (Double) entity.getValue("breadth");
 				return width * breadth;
 			}};
-		CalculatedAttribute priceBandAtt = new CalculatedAttribute("priceBand", priceBand) {
+		CalculatedAttribute priceBandPriceAtt = new CalculatedAttribute("priceBand", priceBand) {
 			@Override
 			public Object calculate(Entity entity) {
 				double price = (Double) entity.getValue("price");
+				if(price < 50000) {
+					return PriceBand.LOW;
+				} else if(price < 75000) {
+					return PriceBand.MEDIUM;
+				} else if(price < 100000) {
+					return PriceBand.HIGH;
+				} else {
+					return PriceBand.PREMIUM;
+				}
+			}};
+		CalculatedAttribute priceBandOfferAtt = new CalculatedAttribute("priceBand", priceBand) {
+			@Override
+			public Object calculate(Entity entity) {
+				double price = (Double) entity.getValue("offerPrice");
 				if(price < 50000) {
 					return PriceBand.LOW;
 				} else if(price < 75000) {
@@ -223,7 +269,7 @@ public class DomainTest {
 		CalculatedAttribute saleSpeedAtt = new CalculatedAttribute("saleSpeed", speedBand) {
 			@Override
 			public Object calculate(Entity entity) {
-				throw new UnsupportedOperationException();
+				return SpeedBand.MEDIUM; // TODO impl sometime
 			}};
 		
 		dom.extend("RoomInfo", "Room", roomSizeAtt);
@@ -240,11 +286,11 @@ public class DomainTest {
 				return ! (Boolean) e.getValue("accepted");
 			}}), "accepted");
 		
-		dom.extend("PropertyInfo", "Property", priceBandAtt, areaCodeAtt, numberOfRoomsAtt, squareFeetAtt);
+		dom.extend("PropertyInfo", "Property", priceBandPriceAtt, areaCodeAtt, numberOfRoomsAtt, squareFeetAtt);
 		
 		dom.summarize("CurrentOffer", "Offer", dom.project("Offer", "address", "bidderName", "bidderAddress"), new Aggregate() {
 			@Override
-			public Entity aggregate(Set<Entity> entities) {
+			public Entity aggregate(Entity base, Set<Entity> entities) {
 				return Collections.max(entities, new Comparator<Entity>() {
 					@Override
 					public int compare(Entity o1, Entity o2) {
@@ -258,11 +304,11 @@ public class DomainTest {
 				dom.join("CurrentOffer", dom.project("Property", "address", "agent", "dateRegistered"))),
 			"offerDate", "bidderName", "bidderAddress");
 		
-		dom.project("SoldProperty", "RawSales", "address");
+		dom.project("SoldProperty", dom.resolve("RawSales"), "address");
 		
 		dom.minus("UnsoldProperty", dom.project("Property", "address"), "SoldProperty");
 		
-		dom.project("SalesInfo", dom.extend("RawSales", areaCodeAtt, saleSpeedAtt, priceBandAtt),
+		dom.project("SalesInfo", dom.extend("RawSales", areaCodeAtt, saleSpeedAtt, priceBandOfferAtt),
 			"address", "agent", "areaCode", "saleSpeed", "priceBand");
 		
 		dom.project("SalesCommissions", dom.join("SalesInfo", "Commission"), "address", "agent", "commission");
@@ -277,8 +323,16 @@ public class DomainTest {
 		
 		dom.project("CommissionDue", dom.summarize("SalesCommissions", dom.project("SalesCommissions", "agent"), new Aggregate() {
 			@Override
-			public Entity aggregate(Set<Entity> entities) {
-				throw new UnsupportedOperationException();
+			public Entity aggregate(Entity base, Set<Entity> entities) {
+				Double total = CollectionUtils.sumDouble(entities, new Function1<Double, Entity>() {
+					@Override
+					public Double execute(Entity p) {
+						return (Double) p.getValue("commission");
+					}});
+				
+				TreeSet<AttributeValue> values = new TreeSet<AttributeValue>(base.getValues());
+				values.add(new AttributeValue(new Attribute("totalCommission", Types.DOUBLE), total));
+				return new Entity(values);
 			}}), "agent", "totalCommission");
 		
 		return dom;
