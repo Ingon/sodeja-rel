@@ -1,6 +1,7 @@
 package org.sodeja.rel;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -132,7 +133,7 @@ public class BaseRelation implements Relation {
 
 	@Override
 	public Set<Entity> select() {
-		return entities;
+		return Collections.unmodifiableSet(entities);
 	}
 	
 	private Entity extract(Entity e, Set<Attribute> attributes) {
