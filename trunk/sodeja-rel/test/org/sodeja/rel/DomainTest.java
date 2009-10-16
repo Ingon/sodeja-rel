@@ -28,12 +28,6 @@ public class DomainTest {
 				"photo", null,
 				"agent", "agent1",
 				"dateRegistered", offerDate);
-//		domain.insertPlain("Property", 
-//				"address", "Sofia, ML1",
-//				"price", 90000.0,
-//				"photo", null,
-//				"agent", "agent1",
-//				"dateRegistered", offerDate);
 		
 		domain.insertPlain("Offer",
 				"address", "Sofia, OK",
@@ -115,11 +109,7 @@ public class DomainTest {
 				"saleSpeed", SpeedBand.MEDIUM,
 				"commission", 3000.0);
 		
-		try {
 		domain.commit();
-		} catch(Exception e) {
-			e.printStackTrace();
-		}
 		
 		System.out.println("Property: " + domain.select("Property"));
 		System.out.println("Offer: " + domain.select("Offer"));
@@ -143,6 +133,20 @@ public class DomainTest {
 		System.out.println("OpenOffers: " + domain.select("OpenOffers"));
 		System.out.println("PropertyForWebSite: " + domain.select("PropertyForWebSite"));
 		System.out.println("CommissionDue: " + domain.select("CommissionDue"));
+		
+		domain.begin();
+		domain.insertPlain("Property", 
+				"address", "Sofia, ML1",
+				"price", 90000.0,
+				"photo", null,
+				"agent", "agent1",
+				"dateRegistered", offerDate);
+		try {
+			domain.commit();
+		} catch(ConstraintViolationException exc) {
+			System.out.println("Rolledback");
+		}
+		System.out.println("Property: " + domain.select("Property"));
 		
 //		System.out.println();
 //		System.out.println();
