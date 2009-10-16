@@ -6,4 +6,9 @@ class Alias implements Type {
 	protected Alias(Type delegate) {
 		this.delegate = delegate;
 	}
+
+	@Override
+	public boolean accepts(Object o) {
+		return delegate.accepts(o);
+	}
 }

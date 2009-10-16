@@ -32,4 +32,9 @@ public class Attribute implements Comparable<Attribute> {
 	public int compareTo(Attribute o) {
 		return name.compareToIgnoreCase(o.name);
 	}
+
+	@Override
+	public String toString() {
+		return name;
+	}
 }

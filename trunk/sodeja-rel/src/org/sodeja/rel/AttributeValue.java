@@ -33,4 +33,9 @@ public class AttributeValue implements Comparable<AttributeValue> {
 	public int compareTo(AttributeValue o) {
 		return attribute.compareTo(o.attribute);
 	}
+
+	@Override
+	public String toString() {
+		return attribute + "::" + value;
+	}
 }
