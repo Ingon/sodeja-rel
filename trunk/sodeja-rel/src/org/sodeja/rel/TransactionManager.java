@@ -100,7 +100,7 @@ class TransactionManager {
 		TransactionInfo info = state.get();
 		info.rolledback = true;
 		order.remove(info);
-//		state.remove();
+		state.remove();
 	}
 	
 	protected Set<BaseEntity> get(BaseRelation key) {
