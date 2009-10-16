@@ -4,7 +4,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -16,6 +15,7 @@ import org.sodeja.functional.Predicate1;
 import org.sodeja.lang.ObjectUtils;
 
 public class BaseRelation implements Relation {
+	protected final Domain domain;
 	protected final String name;
 	protected final Set<Attribute> attributes;
 	
@@ -23,11 +23,14 @@ public class BaseRelation implements Relation {
 	protected Map<BaseRelation, Set<Attribute>> fks = new HashMap<BaseRelation, Set<Attribute>>();
 	protected Set<BaseRelation> references = new HashSet<BaseRelation>();
 
-	protected Set<Entity> entities = new HashSet<Entity>();
+//	protected Set<Entity> entities = new HashSet<Entity>();
 	
-	protected BaseRelation(String name, Attribute... attributes) {
+	protected BaseRelation(Domain domain, String name, Attribute... attributes) {
+		this.domain = domain;
 		this.name = name;
 		this.attributes = new TreeSet<Attribute>(Arrays.asList(attributes));
+		
+		this.domain.manager.set(this, Collections.<Entity>emptySet());
 	}
 	
 	public BaseRelation primaryKey(String... attributeNames) {
@@ -61,7 +64,10 @@ public class BaseRelation implements Relation {
 		Entity e = new Entity(extractValues(attributeValues));
 		checkPrimaryKey(e);
 		checkForeignKeys(e);
-		entities.add(e);
+		
+		Set<Entity> newValues = new HashSet<Entity>(getEntities());
+		newValues.add(e);
+		setEntities(newValues);
 	}
 
 	public void delete(Set<Pair<String, Object>> attributeValues) {
@@ -80,13 +86,15 @@ public class BaseRelation implements Relation {
 	}
 	
 	public void delete(Condition cond) {
-		for(Iterator<Entity> ite = entities.iterator(); ite.hasNext(); ) {
-			Entity e = ite.next();
+		Set<Entity> entities = new HashSet<Entity>();
+		for(Entity e : getEntities()) {
 			if(cond.satisfied(e)) {
 				checkDeletion(e);
-				ite.remove();
+			} else {
+				entities.add(e);
 			}
 		}
+		setEntities(entities);
 	}
 	
 	private void checkDeletion(Entity e) {
@@ -133,7 +141,7 @@ public class BaseRelation implements Relation {
 
 	@Override
 	public Set<Entity> select() {
-		return Collections.unmodifiableSet(entities);
+		return Collections.unmodifiableSet(getEntities());
 	}
 	
 	private Entity extract(Entity e, Set<Attribute> attributes) {
@@ -145,7 +153,7 @@ public class BaseRelation implements Relation {
 	}
 
 	protected Entity selectByKey(Entity pk) {
-		OUTER: for(Entity e : entities) {
+		OUTER: for(Entity e : getEntities()) {
 			for(AttributeValue pkVal : pk.getValues()) {
 				Object eval = e.getValue(pkVal.attribute.name);
 				if(! ObjectUtils.equalsIfNull(pkVal.value, eval)) {
@@ -155,6 +163,14 @@ public class BaseRelation implements Relation {
 			return e;
 		}
 		return null;
+	}
+
+	private Set<Entity> getEntities() {
+		return domain.manager.get(this);
+	}
+	
+	private void setEntities(Set<Entity> entities) {
+		domain.manager.set(this, Collections.unmodifiableSet(entities));
 	}
 	
 	private Function1<Attribute, String> attributeFinder = new Function1<Attribute, String>() {

@@ -12,6 +12,9 @@ import org.sodeja.functional.Function1;
 public class DomainTest {
 	public static void main(String[] args) {
 		Domain domain = setupDomain();
+		
+		domain.begin();
+		
 		Date offerDate = new Date();
 		domain.insertPlain("Property", 
 				"address", "Sofia, OK",
@@ -25,6 +28,12 @@ public class DomainTest {
 				"photo", null,
 				"agent", "agent1",
 				"dateRegistered", offerDate);
+//		domain.insertPlain("Property", 
+//				"address", "Sofia, ML1",
+//				"price", 90000.0,
+//				"photo", null,
+//				"agent", "agent1",
+//				"dateRegistered", offerDate);
 		
 		domain.insertPlain("Offer",
 				"address", "Sofia, OK",
@@ -105,6 +114,12 @@ public class DomainTest {
 				"areaCode", AreaCode.CITY,
 				"saleSpeed", SpeedBand.MEDIUM,
 				"commission", 3000.0);
+		
+		try {
+		domain.commit();
+		} catch(Exception e) {
+			e.printStackTrace();
+		}
 		
 		System.out.println("Property: " + domain.select("Property"));
 		System.out.println("Offer: " + domain.select("Offer"));
@@ -202,7 +217,6 @@ public class DomainTest {
 				.primaryKey("priceBand", "areaCode", "saleSpeed");
 		
 		// Internal
-		
 		
 		CalculatedAttribute roomSizeAtt = new CalculatedAttribute("roomSize", Types.DOUBLE) {
 			@Override
@@ -344,6 +358,21 @@ public class DomainTest {
 				values.add(new AttributeValue(new Attribute("totalCommission", Types.DOUBLE), total));
 				return new Entity(values);
 			}}), "agent", "totalCommission");
+		
+		// Integrity
+		dom.addCheck("All properties at least one room", new IntegrityCheck() {
+			Relation intRelation = dom.restrict("PropertyInfo", new Condition() {
+				@Override
+				public boolean satisfied(Entity e) {
+					int rooms = (Integer) e.getValue("numberOfRooms");
+					return rooms < 1;
+				}});
+			
+			@Override
+			public boolean perform() {
+				return intRelation.select().size() == 0;
+			}
+		});
 		
 		return dom;
 	}
