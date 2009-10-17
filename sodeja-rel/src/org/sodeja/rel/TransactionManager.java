@@ -9,12 +9,14 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicReference;
 
 class TransactionManager {
+	private final Domain domain;
 	private final AtomicReference<Version> versionRef;
 	private final ThreadLocal<TransactionInfo> state = new ThreadLocal<TransactionInfo>();
 	private final ConcurrentLinkedQueue<TransactionInfo> order = new ConcurrentLinkedQueue<TransactionInfo>();
 	private final UUIDGenerator idGen = new UUIDGenerator();
 	
-	protected TransactionManager() {
+	protected TransactionManager(Domain domain) {
+		this.domain = domain;
 		versionRef = new AtomicReference<Version>(new Version(idGen.next(), new HashMap<BaseRelation, Set<BaseEntity>>(), new HashMap<BaseRelation, Set<UUID>>(), null));
 	}
 	
@@ -26,13 +28,14 @@ class TransactionManager {
 	public void commit() {
 		TransactionInfo info = state.get();
 		if(info == null) {
-			throw new RuntimeException("No transaction");
+			throw new TransactionRequiredException("No transaction");
 		}
 		if(info.rolledback) {
 			throw new RollbackException("Already rolledback");
 		}
 		if(info.delta.size() == 0) { // Only reads
 			clearInfo(info);
+			return;
 		}
 		while(order.peek() != info) { // if we are not the head, wait for it
 			synchronized(info) { 
@@ -42,6 +45,13 @@ class TransactionManager {
 					e.printStackTrace(); // Hmmm ? rollback?
 				} 
 			}
+		}
+		
+		try {
+			domain.integrityCheck();
+		} catch(ConstraintViolationException exc) {
+			rollback();
+			throw exc;
 		}
 		
 		UUID verId = idGen.next();
@@ -104,17 +114,16 @@ class TransactionManager {
 	public void rollback() {
 		TransactionInfo info = state.get();
 		info.rolledback = true;
-		order.remove(info);
-		state.remove();
+		clearInfo(info);
 	}
 	
 	protected Set<BaseEntity> get(BaseRelation key) {
-		ValuesDelta info = getInfo();
+		ValuesDelta info = getInfo(false);
 		return info.values.get(key);
 	}
 
 	protected void set(BaseRelation key, Set<BaseEntity> value, Set<UUID> delta) {
-		ValuesDelta info = getInfo();
+		ValuesDelta info = getInfo(true);
 		info.values.put(key, value);
 		
 		Set<UUID> merged = new HashSet<UUID>(delta);
@@ -125,10 +134,13 @@ class TransactionManager {
 		info.delta.put(key, delta);
 	}
 
-	private ValuesDelta getInfo() {
+	private ValuesDelta getInfo(boolean withTransaction) {
 		TransactionInfo transactionInfo = state.get();
 		if(transactionInfo != null && transactionInfo.rolledback) {
 			throw new RollbackException("Transaction already rolledback");
+		}
+		if(withTransaction && transactionInfo == null) {
+			throw new TransactionRequiredException("Must be in transaction");
 		}
 		return transactionInfo != null ? transactionInfo : versionRef.get();
 	}

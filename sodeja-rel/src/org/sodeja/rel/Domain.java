@@ -17,9 +17,10 @@ import org.sodeja.rel.relations.RestrictRelation;
 import org.sodeja.rel.relations.SummarizeRelation;
 
 public class Domain {
+	private final Set<BaseRelation> baseRelations = new HashSet<BaseRelation>();
 	private final Map<String, Relation> relations = new HashMap<String, Relation>();
 	private final Map<String, IntegrityCheck> checks = new HashMap<String, IntegrityCheck>();
-	protected final TransactionManager manager = new TransactionManager();
+	private final TransactionManager manager = new TransactionManager(this);
 	
 	public Domain() {
 	}
@@ -32,11 +33,17 @@ public class Domain {
 		checks.remove(name);
 	}
 	
-	protected void performChecks() {
+	protected void performExternalChecks() {
 		for(Map.Entry<String, IntegrityCheck> check : checks.entrySet()) {
 			if(! check.getValue().perform()) {
 				throw new ConstraintViolationException("Integrity constraint \"" + check.getKey() + "\" failed");
 			}
+		}
+	}
+	
+	protected void performInternalChecks() {
+		for(BaseRelation rel : baseRelations) {
+			rel.integrityChecks();
 		}
 	}
 	
@@ -67,11 +74,17 @@ public class Domain {
 	private <T extends Relation> T remember(String name, T relation) {
 		if(! StringUtils.isTrimmedEmpty(name)) {
 			relations.put(name, relation);
+			if(relation instanceof BaseRelation) {
+				baseRelations.add((BaseRelation) relation);
+			}
 		}
 		return relation;
 	}
 	
 	public BaseRelation relation(String name, Attribute... attributes) {
+		if(StringUtils.isTrimmedEmpty(name)) {
+			throw new RuntimeException("Name is required for base relations");
+		}
 		return remember(name, new BaseRelation(this, name, attributes));
 	}
 
@@ -163,23 +176,26 @@ public class Domain {
 		return remember(name, new SummarizeRelation(name, relation, other, aggregate));
 	}
 
-	public void begin() {
-		manager.begin();
+	public TransactionManager getTransactionManager() {
+		return manager;
 	}
-	
-	public void commit() {
-		try {
-			performChecks();
-			manager.commit();
-		} catch(ConstraintViolationException e) {
-			manager.rollback();
-			throw e;
-		}
-	}
-	
-	public void rollback() {
-		manager.rollback();
-	}
+//	public void begin() {
+//		manager.begin();
+//	}
+//	
+//	public void commit() {
+//		try {
+//			performChecks();
+//			manager.commit();
+//		} catch(ConstraintViolationException e) {
+//			manager.rollback();
+//			throw e;
+//		}
+//	}
+//	
+//	public void rollback() {
+//		manager.rollback();
+//	}
 	
 	public void insertPlain(String name, Object... namedValues) {
 		Set<Pair<String, Object>> values = new HashSet<Pair<String,Object>>();
@@ -211,5 +227,10 @@ public class Domain {
 
 	public void delete(String name, Condition cond) {
 		resolveBase(name).delete(cond);
+	}
+
+	protected void integrityCheck() {
+		performInternalChecks();
+		performExternalChecks();
 	}
 }

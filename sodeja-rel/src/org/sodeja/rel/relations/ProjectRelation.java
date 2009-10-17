@@ -10,13 +10,17 @@ import org.sodeja.rel.Entity;
 import org.sodeja.rel.Relation;
 
 public class ProjectRelation extends DerivedRelation {
-	protected final String[] attributes;
+	protected final Set<String> attributes;
 	
 	public ProjectRelation(String name, Relation relation, String[] attributes) {
-		super(name, relation);
-		this.attributes = attributes;
+		this(name, relation, SetUtils.asSet(attributes));
 	}
 
+	public ProjectRelation(String name, Relation relation, Set<String> attributes) {
+		super(name, relation);
+		this.attributes = new TreeSet<String>(attributes);
+	}
+	
 	@Override
 	public Set<Entity> select() {
 		Set<Entity> entities = relation.select();
