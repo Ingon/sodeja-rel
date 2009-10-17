@@ -1,10 +1,11 @@
 package org.sodeja.rel;
 
+
 public class IntegrityTests {
 	private static boolean log = false;
 
 	public static void main(String[] args) {
-//		pkCheck(createDomain());
+		pkCheck(createDomain());
 		fkCheck(createDomain());
 	}
 	
