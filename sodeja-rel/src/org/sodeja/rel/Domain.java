@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import org.sodeja.collections.SetUtils;
 import org.sodeja.functional.Pair;
 import org.sodeja.lang.StringUtils;
 import org.sodeja.rel.relations.ExtendRelation;
@@ -179,30 +180,9 @@ public class Domain {
 	public TransactionManager getTransactionManager() {
 		return manager;
 	}
-//	public void begin() {
-//		manager.begin();
-//	}
-//	
-//	public void commit() {
-//		try {
-//			performChecks();
-//			manager.commit();
-//		} catch(ConstraintViolationException e) {
-//			manager.rollback();
-//			throw e;
-//		}
-//	}
-//	
-//	public void rollback() {
-//		manager.rollback();
-//	}
 	
 	public void insertPlain(String name, Object... namedValues) {
-		Set<Pair<String, Object>> values = new HashSet<Pair<String,Object>>();
-		for(int i = 0; i < namedValues.length; i+=2) {
-			values.add(Pair.of((String) namedValues[i], namedValues[i + 1]));
-		}
-		insert(name, values);
+		insert(name, SetUtils.namedValuesToSet(namedValues));
 	}
 	
 	public void insert(String name, Set<Pair<String, Object>> attributeValues) {
@@ -213,14 +193,18 @@ public class Domain {
 		return resolve(name).select();
 	}
 	
-	public void deletePlain(String name, Object... namedValues) {
-		Set<Pair<String, Object>> values = new HashSet<Pair<String,Object>>();
-		for(int i = 0; i < namedValues.length; i+=2) {
-			values.add(Pair.of((String) namedValues[i], namedValues[i + 1]));
-		}
-		delete(name, values);
+	public void updatePlain(String name, Condition cond, Object... namedValues) {
+		update(name, cond, SetUtils.namedValuesToSet(namedValues));
 	}
 	
+	public void update(String name, Condition cond, Set<Pair<String, Object>> attributeValues) {
+		resolveBase(name).update(cond, attributeValues);
+	}
+	
+	public void deletePlain(String name, Object... namedValues) {
+		delete(name, SetUtils.namedValuesToSet(namedValues));
+	}
+
 	public void delete(String name, Set<Pair<String, Object>> attributeValues) {
 		resolveBase(name).delete(attributeValues);
 	}
