@@ -9,11 +9,11 @@ import java.util.TreeSet;
 import org.sodeja.collections.CollectionUtils;
 import org.sodeja.functional.Function1;
 
-public class DomainTest {
+public class FRPPaperTest {
 	public static void main(String[] args) {
 		final Domain domain = setupDomain();
 		
-		domain.begin();
+		domain.getTransactionManager().begin();
 		
 		Date offerDate = new Date();
 		domain.insertPlain("Property", 
@@ -123,7 +123,7 @@ public class DomainTest {
 				"saleSpeed", SpeedBand.MEDIUM,
 				"commission", 3000.0);
 		
-		domain.commit();
+		domain.getTransactionManager().commit();
 		
 		System.out.println("Property: " + domain.select("Property"));
 		System.out.println("Offer: " + domain.select("Offer"));
@@ -148,7 +148,7 @@ public class DomainTest {
 		System.out.println("PropertyForWebSite: " + domain.select("PropertyForWebSite"));
 		System.out.println("CommissionDue: " + domain.select("CommissionDue"));
 		
-		domain.begin();
+		domain.getTransactionManager().begin();
 		domain.insertPlain("Property", 
 				"address", "Sofia, ML1",
 				"price", 90000.0,
@@ -156,7 +156,7 @@ public class DomainTest {
 				"agent", "agent1",
 				"dateRegistered", offerDate);
 		try {
-			domain.commit();
+			domain.getTransactionManager().commit();
 		} catch(ConstraintViolationException exc) {
 			System.out.println("Rolledback");
 		}
@@ -168,9 +168,9 @@ public class DomainTest {
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
-				domain.begin();
+				domain.getTransactionManager().begin();
 				try {
-					Thread.currentThread().sleep(1000);
+					Thread.sleep(1000);
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
@@ -183,7 +183,7 @@ public class DomainTest {
 //						);
 				domain.deletePlain("Room", "roomName", "Supp");
 				try {
-					domain.commit();
+					domain.getTransactionManager().commit();
 					System.out.println("TH1 succ");
 				} catch(RollbackException exc) {
 					System.out.println("Not Properly rolledback");
@@ -195,7 +195,7 @@ public class DomainTest {
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
-				domain.begin();
+				domain.getTransactionManager().begin();
 //				domain.insertPlain("Room", 
 //						"address", "Sofia, OK",
 //						"roomName", "Third",
@@ -205,7 +205,7 @@ public class DomainTest {
 //						);
 				domain.deletePlain("Room", "roomName", "Supp");
 				try {
-					domain.commit();
+					domain.getTransactionManager().commit();
 				} catch(RollbackException exc) {
 					System.out.println("Properly rolledback");
 				}
@@ -216,7 +216,7 @@ public class DomainTest {
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
-				domain.begin();
+				domain.getTransactionManager().begin();
 //				domain.insertPlain("Room", 
 //						"address", "Sofia, OK",
 //						"roomName", "Third",
@@ -226,7 +226,7 @@ public class DomainTest {
 //						);
 				domain.deletePlain("Room", "roomName", "Supp1");
 				try {
-					domain.commit();
+					domain.getTransactionManager().commit();
 					System.out.println("TH3 succ");
 				} catch(RollbackException exc) {
 					System.out.println("Not Properly rolledback");
@@ -257,6 +257,7 @@ public class DomainTest {
 		
 		// Base
 		
+		dom.getTransactionManager().begin();
 		dom.relation("Property",
 				new Attribute("address", address),
 				new Attribute("price", price),
@@ -307,6 +308,7 @@ public class DomainTest {
 				new Attribute("saleSpeed", speedBand),
 				new Attribute("commission", Types.DOUBLE))
 				.primaryKey("priceBand", "areaCode", "saleSpeed");
+		dom.getTransactionManager().commit();
 		
 		// Internal
 		
@@ -467,5 +469,32 @@ public class DomainTest {
 		});
 		
 		return dom;
+	}
+
+	public enum AreaCode {
+		CITY,
+		SUBURBAN,
+		RURAL;
+	}
+
+	public enum PriceBand {
+		LOW,
+		MEDIUM,
+		HIGH,
+		PREMIUM;
+	}
+
+	public enum RoomType {
+		KITCHEM,
+		BATHROOM,
+		LIVING_ROOM;
+	}
+
+	public enum SpeedBand {
+		VERY_FAST,
+		FAST,
+		MEDIUM,
+		SLOW,
+		VERY_SLOW;
 	}
 }

@@ -10,10 +10,12 @@ import java.util.TreeSet;
 import java.util.UUID;
 
 import org.sodeja.collections.CollectionUtils;
+import org.sodeja.collections.SetUtils;
 import org.sodeja.functional.Function1;
 import org.sodeja.functional.Pair;
 import org.sodeja.functional.Predicate1;
 import org.sodeja.lang.ObjectUtils;
+import org.sodeja.rel.relations.ProjectRelation;
 
 public class BaseRelation implements Relation {
 	protected final Domain domain;
@@ -62,8 +64,6 @@ public class BaseRelation implements Relation {
 	
 	public void insert(Set<Pair<String, Object>> attributeValues) {
 		BaseEntity e = new BaseEntity(idGen.next(), extractValues(attributeValues));
-		checkPrimaryKey(e);
-		checkForeignKeys(e);
 		
 		Set<BaseEntity> newValues = new HashSet<BaseEntity>(getEntities());
 		newValues.add(e);
@@ -84,7 +84,7 @@ public class BaseRelation implements Relation {
 	}
 	
 	private Set<AttributeValue> merge(BaseEntity e, Set<Pair<String, Object>> attributeValues) {
-		return null;
+		throw new UnsupportedOperationException();
 	}
 
 	public void delete(Set<Pair<String, Object>> attributeValues) {
@@ -129,22 +129,6 @@ public class BaseRelation implements Relation {
 		return selectByKey(pkEntity) != null;
 	}
 
-	private void checkPrimaryKey(Entity e) {
-		Entity pkEntity = extract(e, pk);
-		if(selectByKey(pkEntity) != null) {
-			throw new ConstraintViolationException("Primary key constraint violated");
-		}
-	}
-
-	private void checkForeignKeys(Entity e) {
-		for(Map.Entry<BaseRelation, Set<Attribute>> rel : fks.entrySet()) {
-			Entity fkEntity = extract(e, rel.getValue());
-			if(rel.getKey().selectByKey(fkEntity) == null) {
-				throw new ConstraintViolationException("Foreign key to " + rel.getKey().name + " violated");
-			}
-		}
-	}
-
 	private Set<AttributeValue> extractValues(Set<Pair<String, Object>> attributeValues) {
 		return (Set<AttributeValue>) 
 			CollectionUtils.map(attributeValues, new TreeSet<AttributeValue>(), new Function1<AttributeValue, Pair<String, Object>>() {
@@ -185,11 +169,11 @@ public class BaseRelation implements Relation {
 	}
 
 	private Set<BaseEntity> getEntities() {
-		return domain.manager.get(this);
+		return domain.getTransactionManager().get(this);
 	}
 	
 	private void setEntities(Set<BaseEntity> entities, Set<UUID> delta) {
-		domain.manager.set(this, Collections.unmodifiableSet(entities), delta);
+		domain.getTransactionManager().set(this, Collections.unmodifiableSet(entities), delta);
 	}
 	
 	private Function1<Attribute, String> attributeFinder = new Function1<Attribute, String>() {
@@ -201,4 +185,33 @@ public class BaseRelation implements Relation {
 					return p.name.equals(att);
 				}});
 		}};
+
+	// TODO checks are uneffective currently
+	public void integrityChecks() {
+		checkPrimaryKey();
+		checkForeignKeys();
+	}
+
+	private void checkPrimaryKey() {
+		ProjectRelation rel = new ProjectRelation(null, this, SetUtils.map(pk, new Function1<String, Attribute>() {
+			@Override
+			public String execute(Attribute p) {
+				return p.name;
+			}}));
+		if(getEntities().size() != rel.select().size()) {
+			throw new ConstraintViolationException("Primary key constraint violated");
+		}
+	}
+
+	private void checkForeignKeys() {
+		for(Entity e : getEntities()) {
+			for(Map.Entry<BaseRelation, Set<Attribute>> rel : fks.entrySet()) {
+				Entity fkEntity = extract(e, rel.getValue());
+				if(rel.getKey().selectByKey(fkEntity) == null) {
+					throw new ConstraintViolationException("Foreign key to " + rel.getKey().name + " violated");
+				}
+			}
+		}
+	}
+
 }
