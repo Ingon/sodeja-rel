@@ -92,6 +92,13 @@ public class DomainTest {
 				"type", RoomType.LIVING_ROOM
 				);
 		domain.insertPlain("Room", 
+				"address", "Sofia, OK",
+				"roomName", "Supp1",
+				"width", 5.0,
+				"breadth", 5.0,
+				"type", RoomType.LIVING_ROOM
+				);
+		domain.insertPlain("Room", 
 				"address", "Sofia, ML",
 				"roomName", "Main",
 				"width", 5.0,
@@ -155,6 +162,9 @@ public class DomainTest {
 		}
 		System.out.println("Property: " + domain.select("Property"));
 		
+		System.out.println();
+		System.out.println("Room: " + domain.select("Room"));
+		
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
@@ -174,9 +184,11 @@ public class DomainTest {
 				domain.deletePlain("Room", "roomName", "Supp");
 				try {
 					domain.commit();
+					System.out.println("TH1 succ");
 				} catch(RollbackException exc) {
 					System.out.println("Not Properly rolledback");
 				}
+				System.out.println("Room: " + domain.select("Room"));
 			}
 		}).start();
 		
@@ -197,8 +209,32 @@ public class DomainTest {
 				} catch(RollbackException exc) {
 					System.out.println("Properly rolledback");
 				}
+				System.out.println("Room: " + domain.select("Room"));
 			}
 		}).start();
+
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				domain.begin();
+//				domain.insertPlain("Room", 
+//						"address", "Sofia, OK",
+//						"roomName", "Third",
+//						"width", 5.0,
+//						"breadth", 5.0,
+//						"type", RoomType.LIVING_ROOM
+//						);
+				domain.deletePlain("Room", "roomName", "Supp1");
+				try {
+					domain.commit();
+					System.out.println("TH3 succ");
+				} catch(RollbackException exc) {
+					System.out.println("Not Properly rolledback");
+				}
+				System.out.println("Room: " + domain.select("Room"));
+			}
+		}).start();
+
 		
 //		System.out.println();
 //		System.out.println();
