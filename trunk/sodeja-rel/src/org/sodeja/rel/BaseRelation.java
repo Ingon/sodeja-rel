@@ -70,7 +70,7 @@ public class BaseRelation implements Relation {
 		setEntities(newValues, Collections.<UUID>emptySet());
 	}
 
-	public void update(Set<Pair<String, Object>> attributeValues, Condition cond) {
+	public void update(Condition cond, Set<Pair<String, Object>> attributeValues) {
 		Set<BaseEntity> entities = new HashSet<BaseEntity>();
 		Set<UUID> delta = new HashSet<UUID>();
 		for(BaseEntity e : getEntities()) {
@@ -84,15 +84,31 @@ public class BaseRelation implements Relation {
 	}
 	
 	private Set<AttributeValue> merge(BaseEntity e, Set<Pair<String, Object>> attributeValues) {
-		throw new UnsupportedOperationException();
+		Set<AttributeValue> newValues = new HashSet<AttributeValue>();
+		newValues.addAll(e.getValues());
+		
+		for(Pair<String, Object> value : attributeValues) {
+			AttributeValue oldValue = e.getAttributeValue(value.first);
+			if(oldValue == null) {
+				throw new RuntimeException("Unknown attribute " + value.first);
+			}
+			if(! oldValue.attribute.type.accepts(value.second)) {
+				throw new RuntimeException("Wrong type for attribute " + value.first);
+			}
+			AttributeValue newValue = new AttributeValue(oldValue.attribute, value.second);
+			newValues.remove(oldValue);
+			newValues.add(newValue);
+		}
+		
+		return newValues;
 	}
 
 	public void delete(Set<Pair<String, Object>> attributeValues) {
-		final Entity example = new Entity(extractValues(attributeValues));
+		final Set<AttributeValue> values = extractValues(attributeValues);
 		delete(new Condition() {
 			@Override
 			public boolean satisfied(Entity e) {
-				for(AttributeValue v : example.values) {
+				for(AttributeValue v : values) {
 					if(! ObjectUtils.equalsIfNull(v.value, e.getAttributeValue(v.attribute).value)) {
 						return false;
 					}
