@@ -32,12 +32,12 @@ class TransactionManager {
 			throw new RollbackException("Already rolledback");
 		}
 		if(info.delta.size() == 0) { // Only reads
-			state.remove();
+			clearInfo(info);
 		}
-		if(order.peek() != info) { // if we are not the head, wait for it
+		while(order.peek() != info) { // if we are not the head, wait for it
 			synchronized(info) { 
 				try {
-					info.wait();
+					info.wait(100);
 				} catch (InterruptedException e) {
 					e.printStackTrace(); // Hmmm ? rollback?
 				} 
@@ -55,6 +55,10 @@ class TransactionManager {
 			result = versionRef.compareAndSet(ver, new Version(verId, info.values, info.delta, ver));
 		}
 		
+		clearInfo(info);
+	}
+
+	private void clearInfo(TransactionInfo info) {
 		order.remove(info);
 		state.remove();
 		
@@ -64,7 +68,7 @@ class TransactionManager {
 		}
 		if(nextInfo != null) {
 			synchronized (nextInfo) {
-				nextInfo.notify();
+				nextInfo.notifyAll();
 			}
 		}
 	}
@@ -75,6 +79,7 @@ class TransactionManager {
 			if(checkDiff(curr.delta, info.delta)) {
 				return true;
 			}
+			curr = curr.previous;
 		}
 		return false;
 	}
