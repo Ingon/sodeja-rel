@@ -31,7 +31,11 @@ public class AttributeValue implements Comparable<AttributeValue> {
 
 	@Override
 	public int compareTo(AttributeValue o) {
-		return attribute.compareTo(o.attribute);
+		int temp = attribute.compareTo(o.attribute);
+		if(temp == 0 && value instanceof Comparable<?>) {
+			temp = ((Comparable) value).compareTo(o.value);
+		}
+		return temp;
 	}
 
 	@Override

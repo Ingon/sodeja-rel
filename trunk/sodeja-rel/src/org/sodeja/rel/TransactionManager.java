@@ -9,6 +9,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.sodeja.collections.PersistentSet;
+
 class TransactionManager {
 	private final Domain domain;
 	private final AtomicReference<Version> versionRef;
@@ -18,7 +20,7 @@ class TransactionManager {
 	
 	protected TransactionManager(Domain domain) {
 		this.domain = domain;
-		versionRef = new AtomicReference<Version>(new Version(idGen.next(), new HashMap<BaseRelation, Set<BaseEntity>>(), new HashMap<BaseRelation, Set<UUID>>(), null));
+		versionRef = new AtomicReference<Version>(new Version(idGen.next(), new HashMap<BaseRelation, PersistentSet<BaseEntity>>(), new HashMap<BaseRelation, PersistentSet<UUID>>(), null));
 	}
 	
 	public void begin() {
@@ -109,8 +111,8 @@ class TransactionManager {
 		return false;
 	}
 
-	private boolean checkDiff(Map<BaseRelation, Set<UUID>> target, Map<BaseRelation, Set<UUID>> current) {
-		for(Map.Entry<BaseRelation, Set<UUID>> c : current.entrySet()) {
+	private boolean checkDiff(Map<BaseRelation, PersistentSet<UUID>> target, Map<BaseRelation, PersistentSet<UUID>> current) {
+		for(Map.Entry<BaseRelation, PersistentSet<UUID>> c : current.entrySet()) {
 			Set<UUID> tdelta = target.get(c.getKey());
 			if(tdelta == null) {
 				continue;
@@ -132,21 +134,22 @@ class TransactionManager {
 		clearInfo(info);
 	}
 	
-	protected Set<BaseEntity> get(BaseRelation key) {
+	protected PersistentSet<BaseEntity> get(BaseRelation key) {
 		ValuesDelta info = getInfo(false);
 		return info.values.get(key);
 	}
 
-	protected void set(BaseRelation key, Set<BaseEntity> value, Set<UUID> delta) {
+	protected void set(BaseRelation key, PersistentSet<BaseEntity> value, PersistentSet<UUID> delta) {
 		ValuesDelta info = getInfo(true);
 		info.values.put(key, value);
 		
-		Set<UUID> merged = new HashSet<UUID>(delta);
-		Set<UUID> prevDelta = info.delta.get(key);
+		PersistentSet<UUID> prevDelta = info.delta.get(key);
 		if(prevDelta != null) {
-			merged.addAll(prevDelta);
+			prevDelta = prevDelta.addAllValues(delta);
+		} else {
+			prevDelta = new PersistentSet<UUID>();
 		}
-		info.delta.put(key, delta);
+		info.delta.put(key, prevDelta);
 	}
 
 	private ValuesDelta getInfo(boolean withTransaction) {
@@ -161,10 +164,10 @@ class TransactionManager {
 	}
 	
 	private abstract class ValuesDelta {
-		protected final Map<BaseRelation, Set<BaseEntity>> values;
-		protected final Map<BaseRelation, Set<UUID>> delta;
+		protected final Map<BaseRelation, PersistentSet<BaseEntity>> values;
+		protected final Map<BaseRelation, PersistentSet<UUID>> delta;
 		
-		public ValuesDelta(Map<BaseRelation, Set<BaseEntity>> values, Map<BaseRelation, Set<UUID>> delta) {
+		public ValuesDelta(Map<BaseRelation, PersistentSet<BaseEntity>> values, Map<BaseRelation, PersistentSet<UUID>> delta) {
 			this.values = values;
 			this.delta = delta;
 		}
@@ -175,7 +178,7 @@ class TransactionManager {
 		protected boolean rolledback;
 		
 		public TransactionInfo(Version version) {
-			super(new HashMap<BaseRelation, Set<BaseEntity>>(version.values), new HashMap<BaseRelation, Set<UUID>>());
+			super(new HashMap<BaseRelation, PersistentSet<BaseEntity>>(version.values), new HashMap<BaseRelation, PersistentSet<UUID>>());
 			this.version = version;
 			this.version.transactionInfoCount.incrementAndGet();
 		}
@@ -186,7 +189,7 @@ class TransactionManager {
 		protected final AtomicReference<Version> previousRef;
 		protected final AtomicInteger transactionInfoCount = new AtomicInteger();
 		
-		public Version(UUID id, Map<BaseRelation, Set<BaseEntity>> values, Map<BaseRelation, Set<UUID>> delta, Version previous) {
+		public Version(UUID id, Map<BaseRelation, PersistentSet<BaseEntity>> values, Map<BaseRelation, PersistentSet<UUID>> delta, Version previous) {
 			super(values, delta);
 			this.id = id;
 			this.previousRef = new AtomicReference<Version>(previous);

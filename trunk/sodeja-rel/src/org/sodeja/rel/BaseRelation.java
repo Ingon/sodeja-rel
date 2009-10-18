@@ -10,6 +10,7 @@ import java.util.TreeSet;
 import java.util.UUID;
 
 import org.sodeja.collections.CollectionUtils;
+import org.sodeja.collections.PersistentSet;
 import org.sodeja.collections.SetUtils;
 import org.sodeja.functional.Function1;
 import org.sodeja.functional.Pair;
@@ -32,7 +33,7 @@ public class BaseRelation implements Relation {
 		this.name = name;
 		this.attributes = new TreeSet<Attribute>(Arrays.asList(attributes));
 		
-		setEntities(Collections.<BaseEntity>emptySet(), Collections.<UUID>emptySet());
+		setEntities(new PersistentSet<BaseEntity>(), new PersistentSet<UUID>());
 	}
 	
 	public BaseRelation primaryKey(String... attributeNames) {
@@ -64,23 +65,21 @@ public class BaseRelation implements Relation {
 	
 	public void insert(Set<Pair<String, Object>> attributeValues) {
 		BaseEntity e = new BaseEntity(idGen.next(), extractValues(attributeValues));
-		
-		Set<BaseEntity> newValues = new HashSet<BaseEntity>(getEntities());
-		newValues.add(e);
-		setEntities(newValues, Collections.<UUID>emptySet());
+		setEntities(getEntities().addValue(e), new PersistentSet<UUID>());
 	}
 
 	public void update(Condition cond, Set<Pair<String, Object>> attributeValues) {
-		Set<BaseEntity> entities = new HashSet<BaseEntity>();
-		Set<UUID> delta = new HashSet<UUID>();
-		for(BaseEntity e : getEntities()) {
+		PersistentSet<BaseEntity> currentEntities = getEntities();
+		PersistentSet<UUID> delta = new PersistentSet<UUID>();
+		for(BaseEntity e : currentEntities) {
 			if(cond.satisfied(e)) {
+				currentEntities = currentEntities.removeValue(e);
 				e = new BaseEntity(e.id, merge(e, attributeValues));
-				delta.add(e.id);
+				delta = delta.addValue(e.id);
+				currentEntities = currentEntities.addValue(e);
 			}
-			entities.add(e);
 		}
-		setEntities(entities, delta);
+		setEntities(currentEntities, delta);
 	}
 	
 	private Set<AttributeValue> merge(BaseEntity e, Set<Pair<String, Object>> attributeValues) {
@@ -119,14 +118,14 @@ public class BaseRelation implements Relation {
 	}
 	
 	public void delete(Condition cond) {
-		Set<BaseEntity> entities = new HashSet<BaseEntity>();
-		Set<UUID> delta = new HashSet<UUID>();
-		for(BaseEntity e : getEntities()) {
+		PersistentSet<BaseEntity> entities = getEntities();
+		PersistentSet<UUID> delta = new PersistentSet<UUID>();
+		for(BaseEntity e : entities) {
 			if(cond.satisfied(e)) {
 				checkDeletion(e);
-				delta.add(e.id);
-			} else {
-				entities.add(e);
+				
+				delta = delta.addValue(e.id);
+				entities = entities.removeValue(e);
 			}
 		}
 		setEntities(entities, delta);
@@ -184,12 +183,12 @@ public class BaseRelation implements Relation {
 		return null;
 	}
 
-	private Set<BaseEntity> getEntities() {
+	private PersistentSet<BaseEntity> getEntities() {
 		return domain.getTransactionManager().get(this);
 	}
 	
-	private void setEntities(Set<BaseEntity> entities, Set<UUID> delta) {
-		domain.getTransactionManager().set(this, Collections.unmodifiableSet(entities), delta);
+	private void setEntities(PersistentSet<BaseEntity> entities, PersistentSet<UUID> delta) {
+		domain.getTransactionManager().set(this, entities, delta);
 	}
 	
 	private Function1<Attribute, String> attributeFinder = new Function1<Attribute, String>() {
@@ -215,7 +214,7 @@ public class BaseRelation implements Relation {
 				return p.name;
 			}}));
 		if(getEntities().size() != rel.select().size()) {
-			throw new ConstraintViolationException("Primary key constraint violated");
+			throw new ConstraintViolationException(name + ": Primary key constraint violated");
 		}
 	}
 
@@ -224,7 +223,7 @@ public class BaseRelation implements Relation {
 			for(Map.Entry<BaseRelation, Set<Attribute>> rel : fks.entrySet()) {
 				Entity fkEntity = extract(e, rel.getValue());
 				if(rel.getKey().selectByKey(fkEntity) == null) {
-					throw new ConstraintViolationException("Foreign key to " + rel.getKey().name + " violated");
+					throw new ConstraintViolationException(name + ": Foreign key to " + rel.getKey().name + " violated");
 				}
 			}
 		}
