@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 class TransactionManager {
@@ -66,11 +67,13 @@ class TransactionManager {
 		}
 		
 		clearInfo(info);
+		clearOldVersions();
 	}
 
 	private void clearInfo(TransactionInfo info) {
 		order.remove(info);
 		state.remove();
+		info.version.transactionInfoCount.decrementAndGet();
 		
 		TransactionInfo nextInfo = null;
 		while((nextInfo = order.peek()) != null && nextInfo.rolledback) {
@@ -83,13 +86,25 @@ class TransactionManager {
 		}
 	}
 	
+	protected void clearOldVersions() {
+		Version curr = versionRef.get();
+		while(curr.previousRef.get() != null) {
+			Version prev = curr.previousRef.get();
+			if(prev.transactionInfoCount.get() == 0) {
+				curr.previousRef.set(prev.previousRef.get());
+			} else {
+				curr = curr.previousRef.get();
+			}
+		}
+	}
+	
 	private boolean isTouched(Version ver, TransactionInfo info) { // Poor naming - idea is to check delta on all versions till our version for modifications of same entities
 		Version curr = ver;
 		while(curr != info.version) {
 			if(checkDiff(curr.delta, info.delta)) {
 				return true;
 			}
-			curr = curr.previous;
+			curr = curr.previousRef.get();
 		}
 		return false;
 	}
@@ -162,17 +177,29 @@ class TransactionManager {
 		public TransactionInfo(Version version) {
 			super(new HashMap<BaseRelation, Set<BaseEntity>>(version.values), new HashMap<BaseRelation, Set<UUID>>());
 			this.version = version;
+			this.version.transactionInfoCount.incrementAndGet();
 		}
 	}
 	
 	private class Version extends ValuesDelta {
 		protected final UUID id;
-		protected final Version previous;
+		protected final AtomicReference<Version> previousRef;
+		protected final AtomicInteger transactionInfoCount = new AtomicInteger();
 		
 		public Version(UUID id, Map<BaseRelation, Set<BaseEntity>> values, Map<BaseRelation, Set<UUID>> delta, Version previous) {
 			super(values, delta);
 			this.id = id;
-			this.previous = previous;
+			this.previousRef = new AtomicReference<Version>(previous);
 		}
+	}
+	
+	protected int countVersions() {
+		Version curr = versionRef.get();
+		int i = 0;
+		while(curr != null) {
+			i++;
+			curr = curr.previousRef.get();
+		}
+		return i;
 	}
 }
