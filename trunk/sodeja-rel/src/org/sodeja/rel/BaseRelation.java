@@ -184,11 +184,11 @@ public class BaseRelation implements Relation {
 	}
 
 	private PersistentSet<BaseEntity> getEntities() {
-		return domain.getTransactionManager().get(this);
+		return domain.manager.get(this);
 	}
 	
 	private void setEntities(PersistentSet<BaseEntity> entities, PersistentSet<UUID> delta) {
-		domain.getTransactionManager().set(this, entities, delta);
+		domain.manager.set(this, entities, delta);
 	}
 	
 	private Function1<Attribute, String> attributeFinder = new Function1<Attribute, String>() {
