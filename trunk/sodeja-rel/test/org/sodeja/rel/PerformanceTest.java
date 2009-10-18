@@ -17,11 +17,35 @@ public class PerformanceTest {
 			domain.getTransactionManager().commit();
 			long end = System.currentTimeMillis();
 			long time = end - start;
-			System.out.println("N: " + number++ + " Time: " + time);
-			if(time > 200) {
-				System.out.println("T: " + dep.select().size());
-				System.out.println("V: " + domain.getTransactionManager().countVersions());
-			}
+			System.out.println("Insert Time: " + time);
+			
+			
+			
+			start = System.currentTimeMillis();
+			domain.getTransactionManager().begin();
+			
+			update(domain, idStart, 8);
+			
+			domain.getTransactionManager().commit();
+			end = System.currentTimeMillis();
+			time = end - start;
+			System.out.println("Update Time: " + time);
+
+			
+			
+			start = System.currentTimeMillis();
+			domain.getTransactionManager().begin();
+			
+			delete(domain, idStart + 8, 8);
+			
+			domain.getTransactionManager().commit();
+			end = System.currentTimeMillis();
+			time = end - start;
+			System.out.println("Delete Time: " + time);
+//			if(time > 200) {
+//				System.out.println("T: " + dep.select().size());
+//				System.out.println("V: " + domain.getTransactionManager().countVersions());
+//			}
 		}
 		long totalEnd = System.currentTimeMillis();
 		System.out.println("End: " + (totalEnd - totalStart));
@@ -35,5 +59,19 @@ public class PerformanceTest {
 					"manager", "fairlyLongManagerName");
 		}
 		return baseId + size;
+	}
+
+	private static void update(Domain domain, int baseId, int size) {
+		for(int i = 0;i < size; i++) {
+			domain.updatePlain("Department", Conditions.likeValues("department_id", baseId + i), 
+					"name", "fairlyLongName1", 
+					"manager", "fairlyLongManagerName1");
+		}
+	}
+
+	private static void delete(Domain domain, int baseId, int size) {
+		for(int i = 0;i < size; i++) {
+			domain.deletePlain("Department", "department_id", baseId + i); 
+		}
 	}
 }
