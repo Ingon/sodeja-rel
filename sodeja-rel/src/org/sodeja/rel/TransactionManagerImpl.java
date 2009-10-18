@@ -10,7 +10,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.sodeja.collections.PersistentSet;
 
-class TransactionManagerImpl {
+class TransactionManagerImpl implements TransactionManager {
 	private final Domain domain;
 	private final AtomicReference<Version> versionRef;
 	private final ThreadLocal<TransactionInfo> state = new ThreadLocal<TransactionInfo>();
@@ -22,11 +22,17 @@ class TransactionManagerImpl {
 		versionRef = new AtomicReference<Version>(new Version(idGen.next(), new HashMap<BaseRelation, PersistentSet<BaseEntity>>(), new HashMap<BaseRelation, PersistentSet<UUID>>(), null));
 	}
 	
+	/* (non-Javadoc)
+	 * @see org.sodeja.rel.TransactionManager#begin()
+	 */
 	public void begin() {
 		state.set(new TransactionInfo(versionRef.get()));
 		order.offer(state.get());
 	}
 	
+	/* (non-Javadoc)
+	 * @see org.sodeja.rel.TransactionManager#commit()
+	 */
 	public void commit() {
 		TransactionInfo info = state.get();
 		if(info == null) {
@@ -127,6 +133,9 @@ class TransactionManagerImpl {
 		return false;
 	}
 
+	/* (non-Javadoc)
+	 * @see org.sodeja.rel.TransactionManager#rollback()
+	 */
 	public void rollback() {
 		TransactionInfo info = state.get();
 		info.rolledback = true;
