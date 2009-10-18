@@ -1,7 +1,6 @@
 package org.sodeja.rel;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -11,14 +10,14 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import org.sodeja.collections.PersistentSet;
 
-class TransactionManager {
+class TransactionManagerImpl {
 	private final Domain domain;
 	private final AtomicReference<Version> versionRef;
 	private final ThreadLocal<TransactionInfo> state = new ThreadLocal<TransactionInfo>();
 	private final ConcurrentLinkedQueue<TransactionInfo> order = new ConcurrentLinkedQueue<TransactionInfo>();
 	private final UUIDGenerator idGen = new UUIDGenerator();
 	
-	protected TransactionManager(Domain domain) {
+	protected TransactionManagerImpl(Domain domain) {
 		this.domain = domain;
 		versionRef = new AtomicReference<Version>(new Version(idGen.next(), new HashMap<BaseRelation, PersistentSet<BaseEntity>>(), new HashMap<BaseRelation, PersistentSet<UUID>>(), null));
 	}
