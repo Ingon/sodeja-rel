@@ -6,7 +6,8 @@ public class PerformanceTest {
 		Relation dep = domain.resolveBase("Department");
 		int depId = 0;
 		int number = 1;
-		while(dep.select().size() <= 100000) {
+		long totalStart = System.currentTimeMillis();
+		while(dep.select().size() <= 10000) {
 			long start = System.currentTimeMillis();
 			domain.getTransactionManager().begin();
 			int idStart = depId;
@@ -22,7 +23,8 @@ public class PerformanceTest {
 				System.out.println("V: " + domain.getTransactionManager().countVersions());
 			}
 		}
-		System.out.println("End");
+		long totalEnd = System.currentTimeMillis();
+		System.out.println("End: " + (totalEnd - totalStart));
 	}
 
 	private static int insert(Domain domain, int baseId, int size) {
