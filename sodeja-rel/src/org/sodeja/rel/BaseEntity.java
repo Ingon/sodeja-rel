@@ -11,4 +11,11 @@ class BaseEntity extends Entity {
 		this.id = id;
 	}
 
+	@Override
+	public boolean equals(Object obj) {
+		if(! (obj instanceof BaseEntity)) {
+			return false;
+		}
+		return super.equals(obj);
+	}
 }
