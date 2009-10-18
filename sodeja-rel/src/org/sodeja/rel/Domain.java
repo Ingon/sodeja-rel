@@ -82,6 +82,17 @@ public class Domain {
 		return relation;
 	}
 	
+	public BaseRelation relationPlain(String name, Object... attributes) {
+		if(attributes.length % 2 != 0) {
+			throw new RuntimeException("Expected pairs into the array");
+		}
+		Attribute[] atts = new Attribute[attributes.length / 2];
+		for(int i = 0; i < atts.length; i++) {
+			atts[i] = new Attribute((String) attributes[i * 2], (Type) attributes[i * 2 + 1]);
+		}
+		return relation(name, atts);
+	}
+	
 	public BaseRelation relation(String name, Attribute... attributes) {
 		if(StringUtils.isTrimmedEmpty(name)) {
 			throw new RuntimeException("Name is required for base relations");

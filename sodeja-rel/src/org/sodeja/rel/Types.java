@@ -5,6 +5,7 @@ import java.util.Date;
 public enum Types implements Type {
 	STRING(String.class),
 	INT(int.class, Integer.class),
+	LONG(long.class, Long.class),
 	DOUBLE(double.class, Double.class),
 	DATE(Date.class), 
 	BOOL(boolean.class, Boolean.class);
