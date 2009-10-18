@@ -83,7 +83,7 @@ public class BaseRelation implements Relation {
 	}
 	
 	private Set<AttributeValue> merge(BaseEntity e, Set<Pair<String, Object>> attributeValues) {
-		Set<AttributeValue> newValues = new HashSet<AttributeValue>();
+		Set<AttributeValue> newValues = new TreeSet<AttributeValue>();
 		newValues.addAll(e.getValues());
 		
 		for(Pair<String, Object> value : attributeValues) {
