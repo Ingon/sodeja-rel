@@ -21,7 +21,7 @@ public class Domain {
 	private final Set<BaseRelation> baseRelations = new HashSet<BaseRelation>();
 	private final Map<String, Relation> relations = new HashMap<String, Relation>();
 	private final Map<String, IntegrityCheck> checks = new HashMap<String, IntegrityCheck>();
-	private final TransactionManager manager = new TransactionManager(this);
+	private final TransactionManagerImpl manager = new TransactionManagerImpl(this);
 	
 	public Domain() {
 	}
@@ -177,7 +177,7 @@ public class Domain {
 		return remember(name, new SummarizeRelation(name, relation, other, aggregate));
 	}
 
-	public TransactionManager getTransactionManager() {
+	public TransactionManagerImpl getTransactionManager() {
 		return manager;
 	}
 	
