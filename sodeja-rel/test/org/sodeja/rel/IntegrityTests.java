@@ -43,6 +43,26 @@ public class IntegrityTests {
 				"name", "D2_", 
 				"manager", "U2");
 		expectFail(tx, "Primary");
+
+		tx.begin();
+		domain.updatePlain("Department", Conditions.likeValues("department_id", 0), 
+				"manager", "M0");
+		domain.updatePlain("Department", Conditions.likeValues("department_id", 1),
+				"manager", "M1");
+		expectSucc(tx);
+		
+		tx.begin();
+		domain.updatePlain("Department", Conditions.likeValues("department_id", 1), 
+				"department_id", 0);
+		expectFail(tx, "Primary");
+
+		tx.begin();
+		domain.insertPlain("Department", 
+				"department_id", 1, 
+				"name", "D1_", 
+				"manager", "U1");
+		domain.deletePlain("Department", "department_id", 1);
+		expectSucc(tx);
 	}
 	
 	private static void fkCheck(Domain domain) {
@@ -110,7 +130,7 @@ public class IntegrityTests {
 		}
 	}
 	
-	private static Domain createDomain() {
+	protected static Domain createDomain() {
 		Domain domain = new Domain();
 		domain.getTransactionManager().begin();
 		
