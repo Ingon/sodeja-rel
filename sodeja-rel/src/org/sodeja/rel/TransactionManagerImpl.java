@@ -1,8 +1,6 @@
 package org.sodeja.rel;
 
-import java.util.Deque;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -72,7 +70,7 @@ class TransactionManagerImpl implements TransactionManager {
 		boolean result = versionRef.compareAndSet(info.version, new Version(verId, info.relationInfo, info.version));
 		if(! result) {
 			Version ver = versionRef.get();
-			if(isTouched(ver, info)) {
+			if(containsConflictingChanges(ver, info)) {
 				rollback();
 				throw new RollbackException("");
 			}
@@ -80,7 +78,7 @@ class TransactionManagerImpl implements TransactionManager {
 			Version newVersion = new Version(verId, relationInfo, ver);
 			result = versionRef.compareAndSet(ver, newVersion);
 			if(! result) {
-				throw new RuntimeException();
+				throw new RuntimeException("WTF");
 			}
 			newVersion.clearOld();
 		}
@@ -104,7 +102,7 @@ class TransactionManagerImpl implements TransactionManager {
 		}
 	}
 	
-	private boolean isTouched(Version ver, TransactionInfo info) { // Poor naming - idea is to check delta on all versions till our version for modifications of same entities
+	private boolean containsConflictingChanges(Version ver, TransactionInfo info) {
 		Version curr = ver;
 		while(curr != info.version) {
 			if(checkDiff(curr.relationInfo, info.relationInfo)) {
@@ -133,24 +131,13 @@ class TransactionManagerImpl implements TransactionManager {
 	}
 	
 	private Map<BaseRelation, BaseRelationInfo> merge(Version ver, TransactionInfo info) {
-		Deque<Version> deq = new LinkedList<Version>();
-		Version curr = ver;
-		while(curr != info.version) {
-			deq.offerFirst(curr);
-			curr = curr.previousRef.get();
-		}
-		
 		Map<BaseRelation, BaseRelationInfo> mergedInfo = new HashMap<BaseRelation, BaseRelationInfo>(info.relationInfo);
-		while(! deq.isEmpty()) {
-			Version toMergeVersion = deq.pollFirst();
-			for(BaseRelation r : mergedInfo.keySet()) {
-				BaseRelationInfo currentInfo = mergedInfo.get(r);
-				BaseRelationInfo versionInfo = toMergeVersion.relationInfo.get(r);
-				
-				mergedInfo.put(r, currentInfo.merge(versionInfo));
-			}
+		for(BaseRelation r : ver.relationInfo.keySet()) {
+			BaseRelationInfo versionInfo = ver.relationInfo.get(r);
+			BaseRelationInfo threadInfo = info.relationInfo.get(r);
+			
+			mergedInfo.put(r, versionInfo.merge(threadInfo));
 		}
-		
 		return mergedInfo;
 	}
 
