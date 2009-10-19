@@ -33,7 +33,7 @@ public class BaseRelation implements Relation {
 		this.name = name;
 		this.attributes = new TreeSet<Attribute>(Arrays.asList(attributes));
 		
-		setEntities(new PersistentSet<BaseEntity>(), new PersistentSet<UUID>());
+		setInfo(new BaseRelationInfo());
 	}
 	
 	public BaseRelation primaryKey(String... attributeNames) {
@@ -65,21 +65,23 @@ public class BaseRelation implements Relation {
 	
 	public void insert(Set<Pair<String, Object>> attributeValues) {
 		BaseEntity e = new BaseEntity(idGen.next(), extractValues(attributeValues));
-		setEntities(getEntities().addValue(e), new PersistentSet<UUID>());
+		BaseRelationInfo currentInfo = getInfo();
+		setInfo(new BaseRelationInfo(currentInfo.entities.addValue(e), currentInfo.newSet.addValue(e.id), currentInfo.changeSet));
 	}
 
 	public void update(Condition cond, Set<Pair<String, Object>> attributeValues) {
-		PersistentSet<BaseEntity> currentEntities = getEntities();
-		PersistentSet<UUID> delta = new PersistentSet<UUID>();
+		BaseRelationInfo currentInfo = getInfo();
+		PersistentSet<BaseEntity> currentEntities = currentInfo.entities;
+		PersistentSet<UUID> changeSet = currentInfo.changeSet;
 		for(BaseEntity e : currentEntities) {
 			if(cond.satisfied(e)) {
 				currentEntities = currentEntities.removeValue(e);
 				e = new BaseEntity(e.id, merge(e, attributeValues));
-				delta = delta.addValue(e.id);
+				changeSet = changeSet.addValue(e.id);
 				currentEntities = currentEntities.addValue(e);
 			}
 		}
-		setEntities(currentEntities, delta);
+		setInfo(new BaseRelationInfo(currentEntities, currentInfo.newSet, changeSet));
 	}
 	
 	private Set<AttributeValue> merge(BaseEntity e, Set<Pair<String, Object>> attributeValues) {
@@ -118,17 +120,18 @@ public class BaseRelation implements Relation {
 	}
 	
 	public void delete(Condition cond) {
-		PersistentSet<BaseEntity> entities = getEntities();
-		PersistentSet<UUID> delta = new PersistentSet<UUID>();
-		for(BaseEntity e : entities) {
+		BaseRelationInfo currentInfo = getInfo();
+		PersistentSet<BaseEntity> currentEntities = currentInfo.entities;
+		PersistentSet<UUID> changeSet = currentInfo.changeSet;
+		for(BaseEntity e : currentEntities) {
 			if(cond.satisfied(e)) {
 				checkDeletion(e);
 				
-				delta = delta.addValue(e.id);
-				entities = entities.removeValue(e);
+				changeSet = changeSet.addValue(e.id);
+				currentEntities = currentEntities.removeValue(e);
 			}
 		}
-		setEntities(entities, delta);
+		setInfo(new BaseRelationInfo(currentEntities, currentInfo.newSet, changeSet));
 	}
 	
 	private void checkDeletion(Entity e) {
@@ -159,7 +162,7 @@ public class BaseRelation implements Relation {
 
 	@Override
 	public Set<Entity> select() {
-		return Collections.<Entity>unmodifiableSet(getEntities());
+		return Collections.<Entity>unmodifiableSet(getInfo().entities);
 	}
 	
 	private Entity extract(Entity e, Set<Attribute> attributes) {
@@ -171,7 +174,7 @@ public class BaseRelation implements Relation {
 	}
 
 	protected Entity selectByKey(Entity pk) {
-		OUTER: for(Entity e : getEntities()) {
+		OUTER: for(Entity e : getInfo().entities) {
 			for(AttributeValue pkVal : pk.getValues()) {
 				Object eval = e.getValue(pkVal.attribute.name);
 				if(! ObjectUtils.equalsIfNull(pkVal.value, eval)) {
@@ -183,12 +186,12 @@ public class BaseRelation implements Relation {
 		return null;
 	}
 
-	private PersistentSet<BaseEntity> getEntities() {
+	private BaseRelationInfo getInfo() {
 		return domain.manager.get(this);
 	}
 	
-	private void setEntities(PersistentSet<BaseEntity> entities, PersistentSet<UUID> delta) {
-		domain.manager.set(this, entities, delta);
+	private void setInfo(BaseRelationInfo newInfo) {
+		domain.manager.set(this, newInfo);
 	}
 	
 	private Function1<Attribute, String> attributeFinder = new Function1<Attribute, String>() {
@@ -213,13 +216,15 @@ public class BaseRelation implements Relation {
 			public String execute(Attribute p) {
 				return p.name;
 			}}));
-		if(getEntities().size() != rel.select().size()) {
+		PersistentSet<BaseEntity> entities = getInfo().entities;
+		Set<Entity> pkSel = rel.select();
+		if(entities.size() != pkSel.size()) {
 			throw new ConstraintViolationException(name + ": Primary key constraint violated");
 		}
 	}
 
 	private void checkForeignKeys() {
-		for(Entity e : getEntities()) {
+		for(Entity e : getInfo().entities) {
 			for(Map.Entry<BaseRelation, Set<Attribute>> rel : fks.entrySet()) {
 				Entity fkEntity = extract(e, rel.getValue());
 				if(rel.getKey().selectByKey(fkEntity) == null) {
@@ -227,6 +232,10 @@ public class BaseRelation implements Relation {
 				}
 			}
 		}
+	}
+
+	protected BaseRelationInfo copyInfo(BaseRelationInfo value) {
+		return new BaseRelationInfo(value.entities, new PersistentSet<UUID>(), new PersistentSet<UUID>());
 	}
 
 }

@@ -8,8 +8,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.sodeja.collections.PersistentSet;
-
 class TransactionManagerImpl implements TransactionManager {
 	private final Domain domain;
 	private final AtomicReference<Version> versionRef;
@@ -19,20 +17,14 @@ class TransactionManagerImpl implements TransactionManager {
 	
 	protected TransactionManagerImpl(Domain domain) {
 		this.domain = domain;
-		versionRef = new AtomicReference<Version>(new Version(idGen.next(), new HashMap<BaseRelation, PersistentSet<BaseEntity>>(), new HashMap<BaseRelation, PersistentSet<UUID>>(), null));
+		versionRef = new AtomicReference<Version>(new Version(idGen.next(), new HashMap<BaseRelation, BaseRelationInfo>(), null));
 	}
 	
-	/* (non-Javadoc)
-	 * @see org.sodeja.rel.TransactionManager#begin()
-	 */
 	public void begin() {
 		state.set(new TransactionInfo(versionRef.get()));
 		order.offer(state.get());
 	}
 	
-	/* (non-Javadoc)
-	 * @see org.sodeja.rel.TransactionManager#commit()
-	 */
 	public void commit() {
 		TransactionInfo info = state.get();
 		if(info == null) {
@@ -41,7 +33,7 @@ class TransactionManagerImpl implements TransactionManager {
 		if(info.rolledback) {
 			throw new RollbackException("Already rolledback");
 		}
-		if(info.delta.size() == 0) { // Only reads
+		if(! info.hasChanges()) { // Only reads
 			clearInfo(info);
 			return;
 		}
@@ -63,14 +55,14 @@ class TransactionManagerImpl implements TransactionManager {
 		}
 		
 		UUID verId = idGen.next();
-		boolean result = versionRef.compareAndSet(info.version, new Version(verId, info.values, info.delta, info.version));
+		boolean result = versionRef.compareAndSet(info.version, new Version(verId, info.relationInfo, info.version));
 		if(! result) {
 			Version ver = versionRef.get();
 			if(isTouched(ver, info)) {
 				rollback();
 				throw new RollbackException("");
 			}
-			result = versionRef.compareAndSet(ver, new Version(verId, info.values, info.delta, ver));
+			result = versionRef.compareAndSet(ver, new Version(verId, info.relationInfo, ver));
 		}
 		
 		clearInfo(info);
@@ -97,6 +89,9 @@ class TransactionManagerImpl implements TransactionManager {
 		Version curr = versionRef.get();
 		while(curr.previousRef.get() != null) {
 			Version prev = curr.previousRef.get();
+			if(prev == null) {
+				return;
+			}
 			if(prev.transactionInfoCount.get() == 0) {
 				curr.previousRef.set(prev.previousRef.get());
 			} else {
@@ -107,8 +102,8 @@ class TransactionManagerImpl implements TransactionManager {
 	
 	private boolean isTouched(Version ver, TransactionInfo info) { // Poor naming - idea is to check delta on all versions till our version for modifications of same entities
 		Version curr = ver;
-		while(curr != info.version) {
-			if(checkDiff(curr.delta, info.delta)) {
+		while(curr != null && curr != info.version) {
+			if(checkDiff(curr.relationInfo, info.relationInfo)) {
 				return true;
 			}
 			curr = curr.previousRef.get();
@@ -116,14 +111,14 @@ class TransactionManagerImpl implements TransactionManager {
 		return false;
 	}
 
-	private boolean checkDiff(Map<BaseRelation, PersistentSet<UUID>> target, Map<BaseRelation, PersistentSet<UUID>> current) {
-		for(Map.Entry<BaseRelation, PersistentSet<UUID>> c : current.entrySet()) {
-			Set<UUID> tdelta = target.get(c.getKey());
+	private boolean checkDiff(Map<BaseRelation, BaseRelationInfo> target, Map<BaseRelation, BaseRelationInfo> current) {
+		for(Map.Entry<BaseRelation, BaseRelationInfo> c : current.entrySet()) {
+			Set<UUID> tdelta = target.get(c.getKey()).changeSet;
 			if(tdelta == null) {
 				continue;
 			}
 			
-			Set<UUID> cdelta = c.getValue();
+			Set<UUID> cdelta = c.getValue().changeSet;
 			for(UUID id : cdelta) {
 				if(tdelta.contains(id)) {
 					return true;
@@ -133,31 +128,20 @@ class TransactionManagerImpl implements TransactionManager {
 		return false;
 	}
 
-	/* (non-Javadoc)
-	 * @see org.sodeja.rel.TransactionManager#rollback()
-	 */
 	public void rollback() {
 		TransactionInfo info = state.get();
 		info.rolledback = true;
 		clearInfo(info);
 	}
 	
-	protected PersistentSet<BaseEntity> get(BaseRelation key) {
+	protected BaseRelationInfo get(BaseRelation key) {
 		ValuesDelta info = getInfo(false);
-		return info.values.get(key);
+		return info.relationInfo.get(key);
 	}
 
-	protected void set(BaseRelation key, PersistentSet<BaseEntity> value, PersistentSet<UUID> delta) {
+	protected void set(BaseRelation key, BaseRelationInfo newInfo) {
 		ValuesDelta info = getInfo(true);
-		info.values.put(key, value);
-		
-		PersistentSet<UUID> prevDelta = info.delta.get(key);
-		if(prevDelta != null) {
-			prevDelta = prevDelta.addAllValues(delta);
-		} else {
-			prevDelta = new PersistentSet<UUID>();
-		}
-		info.delta.put(key, prevDelta);
+		info.relationInfo.put(key, newInfo);
 	}
 
 	private ValuesDelta getInfo(boolean withTransaction) {
@@ -172,12 +156,10 @@ class TransactionManagerImpl implements TransactionManager {
 	}
 	
 	private abstract class ValuesDelta {
-		protected final Map<BaseRelation, PersistentSet<BaseEntity>> values;
-		protected final Map<BaseRelation, PersistentSet<UUID>> delta;
-		
-		public ValuesDelta(Map<BaseRelation, PersistentSet<BaseEntity>> values, Map<BaseRelation, PersistentSet<UUID>> delta) {
-			this.values = values;
-			this.delta = delta;
+		protected final Map<BaseRelation, BaseRelationInfo> relationInfo;
+
+		public ValuesDelta(Map<BaseRelation, BaseRelationInfo> relationInfo) {
+			this.relationInfo = relationInfo;
 		}
 	}
 	
@@ -186,9 +168,23 @@ class TransactionManagerImpl implements TransactionManager {
 		protected boolean rolledback;
 		
 		public TransactionInfo(Version version) {
-			super(new HashMap<BaseRelation, PersistentSet<BaseEntity>>(version.values), new HashMap<BaseRelation, PersistentSet<UUID>>());
+			super(version.newRelationInfo());
 			this.version = version;
 			this.version.transactionInfoCount.incrementAndGet();
+		}
+		
+		protected boolean hasChanges() {
+			if(! (relationInfo.keySet().equals(version.relationInfo.keySet()))) {
+				return true;
+			}
+			
+			for(BaseRelationInfo info : relationInfo.values()) {
+				if(info.newSet.isEmpty() && info.changeSet.isEmpty()) {
+					continue;
+				}
+				return true;
+			}
+			return false;
 		}
 	}
 	
@@ -197,10 +193,19 @@ class TransactionManagerImpl implements TransactionManager {
 		protected final AtomicReference<Version> previousRef;
 		protected final AtomicInteger transactionInfoCount = new AtomicInteger();
 		
-		public Version(UUID id, Map<BaseRelation, PersistentSet<BaseEntity>> values, Map<BaseRelation, PersistentSet<UUID>> delta, Version previous) {
-			super(values, delta);
+		public Version(UUID id, Map<BaseRelation, BaseRelationInfo> relationInfo, Version previous) {
+			super(relationInfo);
 			this.id = id;
 			this.previousRef = new AtomicReference<Version>(previous);
+		}
+		
+		public Map<BaseRelation, BaseRelationInfo> newRelationInfo() {
+			Map<BaseRelation, BaseRelationInfo> map = new HashMap<BaseRelation, BaseRelationInfo>();
+			for(Map.Entry<BaseRelation, BaseRelationInfo> e : relationInfo.entrySet()) {
+				BaseRelation rel = e.getKey();
+				map.put(rel, rel.copyInfo(e.getValue()));
+			}
+			return map;
 		}
 	}
 	
