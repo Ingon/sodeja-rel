@@ -2,7 +2,6 @@ package org.sodeja.rel;
 
 import java.util.HashSet;
 import java.util.Set;
-import java.util.UUID;
 
 import org.sodeja.collections.PersistentMap;
 import org.sodeja.collections.PersistentSet;

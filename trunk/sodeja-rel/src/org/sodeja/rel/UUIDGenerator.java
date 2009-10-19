@@ -1,15 +1,14 @@
 package org.sodeja.rel;
 
-import java.security.SecureRandom;
-import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class UUIDGenerator {
-	private final SecureRandom rand = new SecureRandom();
+	private AtomicInteger value = new AtomicInteger();
 	
 	public UUIDGenerator() {
 	}
 	
 	public UUID next() {
-		return new UUID(rand.nextLong(), rand.nextLong());
+		return new UUID(value.getAndIncrement());
 	}
 }

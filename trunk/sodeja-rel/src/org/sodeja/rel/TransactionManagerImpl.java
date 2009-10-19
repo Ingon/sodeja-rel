@@ -5,13 +5,9 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-
-import org.sodeja.collections.PersistentMap;
-import org.sodeja.collections.PersistentSet;
 
 class TransactionManagerImpl implements TransactionManager {
 	private final Domain domain;
