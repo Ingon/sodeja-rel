@@ -3,9 +3,9 @@ package org.sodeja.rel;
 import java.util.Set;
 
 class BaseEntity extends Entity {
-	protected final UUID id;
+	protected final long id;
 	
-	public BaseEntity(UUID id, Set<AttributeValue> values) {
+	public BaseEntity(long id, Set<AttributeValue> values) {
 		super(values);
 		this.id = id;
 	}
@@ -15,6 +15,6 @@ class BaseEntity extends Entity {
 		if(! (obj instanceof BaseEntity)) {
 			return false;
 		}
-		return super.equals(obj);
+		return this.id == ((BaseEntity) obj).id;
 	}
 }
