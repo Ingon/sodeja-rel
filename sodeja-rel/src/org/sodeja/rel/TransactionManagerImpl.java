@@ -1,12 +1,17 @@
 package org.sodeja.rel;
 
+import java.util.Deque;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+
+import org.sodeja.collections.PersistentMap;
+import org.sodeja.collections.PersistentSet;
 
 class TransactionManagerImpl implements TransactionManager {
 	private final Domain domain;
@@ -62,7 +67,8 @@ class TransactionManagerImpl implements TransactionManager {
 				rollback();
 				throw new RollbackException("");
 			}
-			result = versionRef.compareAndSet(ver, new Version(verId, info.relationInfo, ver));
+			Map<BaseRelation, BaseRelationInfo> relationInfo = merge(ver, info);
+			result = versionRef.compareAndSet(ver, new Version(verId, relationInfo, ver));
 		}
 		
 		clearInfo(info);
@@ -102,7 +108,7 @@ class TransactionManagerImpl implements TransactionManager {
 	
 	private boolean isTouched(Version ver, TransactionInfo info) { // Poor naming - idea is to check delta on all versions till our version for modifications of same entities
 		Version curr = ver;
-		while(curr != null && curr != info.version) {
+		while(curr != info.version) {
 			if(checkDiff(curr.relationInfo, info.relationInfo)) {
 				return true;
 			}
@@ -113,12 +119,12 @@ class TransactionManagerImpl implements TransactionManager {
 
 	private boolean checkDiff(Map<BaseRelation, BaseRelationInfo> target, Map<BaseRelation, BaseRelationInfo> current) {
 		for(Map.Entry<BaseRelation, BaseRelationInfo> c : current.entrySet()) {
-			Set<UUID> tdelta = target.get(c.getKey()).changeSet;
+			Set<UUID> tdelta = target.get(c.getKey()).changeSet();
 			if(tdelta == null) {
 				continue;
 			}
 			
-			Set<UUID> cdelta = c.getValue().changeSet;
+			Set<UUID> cdelta = c.getValue().changeSet();
 			for(UUID id : cdelta) {
 				if(tdelta.contains(id)) {
 					return true;
@@ -126,6 +132,28 @@ class TransactionManagerImpl implements TransactionManager {
 			}
 		}
 		return false;
+	}
+	
+	private Map<BaseRelation, BaseRelationInfo> merge(Version ver, TransactionInfo info) {
+		Deque<Version> deq = new LinkedList<Version>();
+		Version curr = ver;
+		while(curr != info.version) {
+			deq.offerFirst(curr);
+			curr = curr.previousRef.get();
+		}
+		
+		Map<BaseRelation, BaseRelationInfo> mergedInfo = new HashMap<BaseRelation, BaseRelationInfo>(info.relationInfo);
+		while(! deq.isEmpty()) {
+			Version toMergeVersion = deq.pollFirst();
+			for(BaseRelation r : mergedInfo.keySet()) {
+				BaseRelationInfo currentInfo = mergedInfo.get(r);
+				BaseRelationInfo versionInfo = toMergeVersion.relationInfo.get(r);
+				
+				mergedInfo.put(r, currentInfo.merge(versionInfo));
+			}
+		}
+		
+		return mergedInfo;
 	}
 
 	public void rollback() {
@@ -179,10 +207,9 @@ class TransactionManagerImpl implements TransactionManager {
 			}
 			
 			for(BaseRelationInfo info : relationInfo.values()) {
-				if(info.newSet.isEmpty() && info.changeSet.isEmpty()) {
-					continue;
+				if(info.hasChanges()) {
+					return true;
 				}
-				return true;
 			}
 			return false;
 		}

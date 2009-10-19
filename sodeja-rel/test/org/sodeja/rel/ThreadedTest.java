@@ -10,7 +10,8 @@ public class ThreadedTest {
 		private final Range insertRange;
 		private final Range insertAnDeleteRange;
 		
-		public TestThread(Domain domain, Range insertRange, Range insertAnDeleteRange) {
+		public TestThread(String name, Domain domain, Range insertRange, Range insertAnDeleteRange) {
+			this.setName(name);
 			this.domain = domain;
 			this.insertRange = insertRange;
 			this.insertAnDeleteRange = insertAnDeleteRange;
@@ -29,7 +30,7 @@ public class ThreadedTest {
 			for(Integer i : insertRange) {
 				domain.getTransactionManager().begin();
 				
-				System.out.println("Insert: " + i);
+				System.out.println(getName() + ": Insert: " + i);
 				domain.insertPlain("Department", 
 						"department_id", i, 
 						"name", "fairlyLongName", 
@@ -41,7 +42,7 @@ public class ThreadedTest {
 			for(Integer i : insertAnDeleteRange) {
 				domain.getTransactionManager().begin();
 
-				System.out.println("Insert: " + i);
+				System.out.println(getName() + ": Insert: " + i);
 				domain.insertPlain("Department", 
 						"department_id", i, 
 						"name", "fairlyLongName", 
@@ -51,7 +52,7 @@ public class ThreadedTest {
 
 				domain.getTransactionManager().begin();
 
-				System.out.println("Delete: " + i);
+				System.out.println(getName() + ": Delete: " + i);
 				domain.deletePlain("Department", "department_id", i); 
 
 				domain.getTransactionManager().commit();
@@ -64,12 +65,12 @@ public class ThreadedTest {
 	public static void main(String[] args) {
 		Domain domain = IntegrityTests.createDomain();
 		
-		TestThread[] threads = new TestThread[10];
+		TestThread[] threads = new TestThread[3];
 		int sz = 10;
 		int delBase = sz * threads.length;
 		
 		for(Integer i : Range.of(threads)) {
-			threads[i] = new TestThread(domain, new Range(i * sz, (i + 1) * sz), new Range(delBase + i * sz, delBase + (i + 1) * sz));
+			threads[i] = new TestThread("TH" + i, domain, new Range(i * sz, (i + 1) * sz), new Range(delBase + i * sz, delBase + (i + 1) * sz));
 			threads[i].start();
 		}
 		
