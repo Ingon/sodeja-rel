@@ -31,7 +31,7 @@ public class IntegrityTests {
 				"department_id", 1, 
 				"name", "D1_", 
 				"manager", "U1");
-		expectFail(tx, "Primary");
+		expectFail(tx, "Department: Primary");
 
 		tx.begin();
 		domain.insertPlain("Department", 
@@ -42,7 +42,7 @@ public class IntegrityTests {
 				"department_id", 2, 
 				"name", "D2_", 
 				"manager", "U2");
-		expectFail(tx, "Primary");
+		expectFail(tx, "Department: Primary");
 
 		tx.begin();
 		domain.updatePlain("Department", Conditions.likeValues("department_id", 0), 
@@ -54,7 +54,7 @@ public class IntegrityTests {
 		tx.begin();
 		domain.updatePlain("Department", Conditions.likeValues("department_id", 1), 
 				"department_id", 0);
-		expectFail(tx, "Primary");
+		expectFail(tx, "Department: Primary");
 
 		tx.begin();
 		domain.insertPlain("Department", 
@@ -87,7 +87,7 @@ public class IntegrityTests {
 				"employee_id", 1, 
 				"name", "E0", 
 				"department_id", 1);
-		expectFail(tx, "Foreign");
+		expectFail(tx, "Employee: Foreign");
 
 		tx.begin();
 		domain.insertPlain("Employee", 
