@@ -10,6 +10,7 @@ import java.util.TreeSet;
 import java.util.UUID;
 
 import org.sodeja.collections.CollectionUtils;
+import org.sodeja.collections.PersistentMap;
 import org.sodeja.collections.PersistentSet;
 import org.sodeja.collections.SetUtils;
 import org.sodeja.functional.Function1;
@@ -65,23 +66,30 @@ public class BaseRelation implements Relation {
 	
 	public void insert(Set<Pair<String, Object>> attributeValues) {
 		BaseEntity e = new BaseEntity(idGen.next(), extractValues(attributeValues));
+		
 		BaseRelationInfo currentInfo = getInfo();
-		setInfo(new BaseRelationInfo(currentInfo.entities.addValue(e), currentInfo.newSet.addValue(e.id), currentInfo.changeSet));
+		PersistentSet<BaseEntity> entities = currentInfo.entities.addValue(e);
+		PersistentMap<UUID, BaseEntity> entityMap = currentInfo.entityMap.putValue(e.id, e);
+		
+		setInfo(currentInfo.newData(entities, entityMap, currentInfo.newSet.addValue(e.id)));
 	}
 
 	public void update(Condition cond, Set<Pair<String, Object>> attributeValues) {
 		BaseRelationInfo currentInfo = getInfo();
-		PersistentSet<BaseEntity> currentEntities = currentInfo.entities;
-		PersistentSet<UUID> changeSet = currentInfo.changeSet;
-		for(BaseEntity e : currentEntities) {
+		PersistentSet<BaseEntity> entities = currentInfo.entities;
+		PersistentMap<UUID, BaseEntity> entityMap = currentInfo.entityMap;
+		PersistentSet<UUID> updateSet = currentInfo.updateSet;
+		for(BaseEntity e : entities) {
 			if(cond.satisfied(e)) {
-				currentEntities = currentEntities.removeValue(e);
+				entities = entities.removeValue(e);
 				e = new BaseEntity(e.id, merge(e, attributeValues));
-				changeSet = changeSet.addValue(e.id);
-				currentEntities = currentEntities.addValue(e);
+				
+				entities = entities.addValue(e);
+				entityMap = entityMap.putValue(e.id, e);
+				updateSet = updateSet.addValue(e.id);
 			}
 		}
-		setInfo(new BaseRelationInfo(currentEntities, currentInfo.newSet, changeSet));
+		setInfo(currentInfo.updateData(entities, entityMap, updateSet));
 	}
 	
 	private Set<AttributeValue> merge(BaseEntity e, Set<Pair<String, Object>> attributeValues) {
@@ -121,17 +129,19 @@ public class BaseRelation implements Relation {
 	
 	public void delete(Condition cond) {
 		BaseRelationInfo currentInfo = getInfo();
-		PersistentSet<BaseEntity> currentEntities = currentInfo.entities;
-		PersistentSet<UUID> changeSet = currentInfo.changeSet;
-		for(BaseEntity e : currentEntities) {
+		PersistentSet<BaseEntity> entities = currentInfo.entities;
+		PersistentMap<UUID, BaseEntity> entityMap = currentInfo.entityMap;
+		PersistentSet<UUID> deleteSet = currentInfo.deleteSet;
+		for(BaseEntity e : entities) {
 			if(cond.satisfied(e)) {
 				checkDeletion(e);
 				
-				changeSet = changeSet.addValue(e.id);
-				currentEntities = currentEntities.removeValue(e);
+				entities = entities.removeValue(e);
+				entityMap = entityMap.removeValue(e.id);
+				deleteSet = deleteSet.addValue(e.id);
 			}
 		}
-		setInfo(new BaseRelationInfo(currentEntities, currentInfo.newSet, changeSet));
+		setInfo(currentInfo.deleteData(entities, entityMap, deleteSet));
 	}
 	
 	private void checkDeletion(Entity e) {
@@ -235,7 +245,7 @@ public class BaseRelation implements Relation {
 	}
 
 	protected BaseRelationInfo copyInfo(BaseRelationInfo value) {
-		return new BaseRelationInfo(value.entities, new PersistentSet<UUID>(), new PersistentSet<UUID>());
+		return value.clearCopy();
 	}
 
 }
