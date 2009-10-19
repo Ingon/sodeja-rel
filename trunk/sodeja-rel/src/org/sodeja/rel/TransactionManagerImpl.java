@@ -117,13 +117,13 @@ class TransactionManagerImpl implements TransactionManager {
 
 	private boolean checkDiff(Map<BaseRelation, BaseRelationInfo> target, Map<BaseRelation, BaseRelationInfo> current) {
 		for(Map.Entry<BaseRelation, BaseRelationInfo> c : current.entrySet()) {
-			Set<UUID> tdelta = target.get(c.getKey()).changeSet();
+			Set<Long> tdelta = target.get(c.getKey()).changeSet();
 			if(tdelta == null) {
 				continue;
 			}
 			
-			Set<UUID> cdelta = c.getValue().changeSet();
-			for(UUID id : cdelta) {
+			Set<Long> cdelta = c.getValue().changeSet();
+			for(Long id : cdelta) {
 				if(tdelta.contains(id)) {
 					return true;
 				}

@@ -15,6 +15,7 @@ import org.sodeja.collections.SetUtils;
 import org.sodeja.functional.Function1;
 import org.sodeja.functional.Pair;
 import org.sodeja.functional.Predicate1;
+import org.sodeja.lang.IDGenerator;
 import org.sodeja.lang.ObjectUtils;
 import org.sodeja.rel.relations.ProjectRelation;
 
@@ -22,7 +23,7 @@ public class BaseRelation implements Relation {
 	protected final Domain domain;
 	protected final String name;
 	protected final Set<Attribute> attributes;
-	protected final UUIDGenerator idGen = new UUIDGenerator();
+	protected final IDGenerator idGen = new IDGenerator();
 	
 	protected Set<Attribute> pk = new TreeSet<Attribute>();
 	protected Map<BaseRelation, Set<Attribute>> fks = new HashMap<BaseRelation, Set<Attribute>>();
@@ -68,16 +69,17 @@ public class BaseRelation implements Relation {
 		
 		BaseRelationInfo currentInfo = getInfo();
 		PersistentSet<BaseEntity> entities = currentInfo.entities.addValue(e);
-		PersistentMap<UUID, BaseEntity> entityMap = currentInfo.entityMap.putValue(e.id, e);
+		PersistentMap<Long, BaseEntity> entityMap = currentInfo.entityMap.putValue(e.id, e);
+		currentInfo.newSet.add(e.id);
 		
-		setInfo(currentInfo.newData(entities, entityMap, currentInfo.newSet.addValue(e.id)));
+		setInfo(currentInfo.copyDelta(entities, entityMap));
 	}
 
 	public void update(Condition cond, Set<Pair<String, Object>> attributeValues) {
 		BaseRelationInfo currentInfo = getInfo();
 		PersistentSet<BaseEntity> entities = currentInfo.entities;
-		PersistentMap<UUID, BaseEntity> entityMap = currentInfo.entityMap;
-		PersistentSet<UUID> updateSet = currentInfo.updateSet;
+		PersistentMap<Long, BaseEntity> entityMap = currentInfo.entityMap;
+
 		for(BaseEntity e : entities) {
 			if(cond.satisfied(e)) {
 				entities = entities.removeValue(e);
@@ -85,10 +87,11 @@ public class BaseRelation implements Relation {
 				
 				entities = entities.addValue(e);
 				entityMap = entityMap.putValue(e.id, e);
-				updateSet = updateSet.addValue(e.id);
+				currentInfo.updateSet.add(e.id);
 			}
 		}
-		setInfo(currentInfo.updateData(entities, entityMap, updateSet));
+		
+		setInfo(currentInfo.copyDelta(entities, entityMap));
 	}
 	
 	private Set<AttributeValue> merge(BaseEntity e, Set<Pair<String, Object>> attributeValues) {
@@ -129,18 +132,19 @@ public class BaseRelation implements Relation {
 	public void delete(Condition cond) {
 		BaseRelationInfo currentInfo = getInfo();
 		PersistentSet<BaseEntity> entities = currentInfo.entities;
-		PersistentMap<UUID, BaseEntity> entityMap = currentInfo.entityMap;
-		PersistentSet<UUID> deleteSet = currentInfo.deleteSet;
+		PersistentMap<Long, BaseEntity> entityMap = currentInfo.entityMap;
+
 		for(BaseEntity e : entities) {
 			if(cond.satisfied(e)) {
 				checkDeletion(e);
 				
 				entities = entities.removeValue(e);
 				entityMap = entityMap.removeValue(e.id);
-				deleteSet = deleteSet.addValue(e.id);
+				currentInfo.deleteSet.add(e.id);
 			}
 		}
-		setInfo(currentInfo.deleteData(entities, entityMap, deleteSet));
+		
+		setInfo(currentInfo.copyDelta(entities, entityMap));
 	}
 	
 	private void checkDeletion(Entity e) {
