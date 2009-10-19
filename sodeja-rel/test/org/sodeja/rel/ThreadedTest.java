@@ -1,5 +1,8 @@
 package org.sodeja.rel;
 
+import java.util.Iterator;
+
+import org.sodeja.collections.SetUtils;
 import org.sodeja.lang.Range;
 
 public class ThreadedTest {
@@ -30,7 +33,7 @@ public class ThreadedTest {
 			for(Integer i : insertRange) {
 				domain.getTransactionManager().begin();
 				
-				System.out.println(getName() + ": Insert: " + i);
+//				System.out.println(getName() + ": Insert: " + i);
 				domain.insertPlain("Department", 
 						"department_id", i, 
 						"name", "fairlyLongName", 
@@ -42,7 +45,7 @@ public class ThreadedTest {
 			for(Integer i : insertAnDeleteRange) {
 				domain.getTransactionManager().begin();
 
-				System.out.println(getName() + ": Insert: " + i);
+//				System.out.println(getName() + ": Insert: " + i);
 				domain.insertPlain("Department", 
 						"department_id", i, 
 						"name", "fairlyLongName", 
@@ -52,7 +55,7 @@ public class ThreadedTest {
 
 				domain.getTransactionManager().begin();
 
-				System.out.println(getName() + ": Delete: " + i);
+//				System.out.println(getName() + ": Delete: " + i);
 				domain.deletePlain("Department", "department_id", i); 
 
 				domain.getTransactionManager().commit();
@@ -65,8 +68,8 @@ public class ThreadedTest {
 	public static void main(String[] args) {
 		Domain domain = IntegrityTests.createDomain();
 		
-		TestThread[] threads = new TestThread[3];
-		int sz = 10;
+		TestThread[] threads = new TestThread[10];
+		int sz = 100;
 		int delBase = sz * threads.length;
 		
 		for(Integer i : Range.of(threads)) {
@@ -97,5 +100,17 @@ public class ThreadedTest {
 		
 		System.out.println("COUNT: " + (domain.resolveBase("Department").select().size()));
 		System.out.println("TIME: " + (end - begin));
+		
+		BaseRelation rel = domain.resolveBase("Department");
+		Iterator<Entity> it = rel.select().iterator();
+		if(it.hasNext()) {
+			Entity e = it.next();
+			Attribute idatt = e.getAttributeValue("department_id").attribute;
+			for(Integer i : new Range(0, threads.length * sz)) {
+				if(rel.selectByKey(new Entity(SetUtils.asSet(new AttributeValue(idatt, i)))) == null) {
+					System.out.println("Missing: " + i);
+				}
+			}
+		}
 	}
 }

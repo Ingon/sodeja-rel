@@ -22,8 +22,19 @@ class TransactionManagerImpl implements TransactionManager {
 	}
 	
 	public void begin() {
-		state.set(new TransactionInfo(versionRef.get()));
-		order.offer(state.get());
+		TransactionInfo newInfo = null;
+		while(true) {
+			Version version = versionRef.get();
+			newInfo = new TransactionInfo(version);
+			version.transactionInfoCount.incrementAndGet();
+			if(versionRef.compareAndSet(version, version)) {
+				break;
+			}
+			version.transactionInfoCount.decrementAndGet();
+		}
+		state.set(newInfo);
+		order.offer(newInfo);
+		return;
 	}
 	
 	public void commit() {
@@ -64,11 +75,15 @@ class TransactionManagerImpl implements TransactionManager {
 				throw new RollbackException("");
 			}
 			Map<BaseRelation, BaseRelationInfo> relationInfo = merge(ver, info);
-			result = versionRef.compareAndSet(ver, new Version(verId, relationInfo, ver));
+			Version newVersion = new Version(verId, relationInfo, ver);
+			result = versionRef.compareAndSet(ver, newVersion);
+			if(! result) {
+				throw new RuntimeException();
+			}
+			newVersion.clearOld();
 		}
 		
 		clearInfo(info);
-		clearOldVersions();
 	}
 
 	private void clearInfo(TransactionInfo info) {
@@ -83,21 +98,6 @@ class TransactionManagerImpl implements TransactionManager {
 		if(nextInfo != null) {
 			synchronized (nextInfo) {
 				nextInfo.notifyAll();
-			}
-		}
-	}
-	
-	protected void clearOldVersions() {
-		Version curr = versionRef.get();
-		while(curr.previousRef.get() != null) {
-			Version prev = curr.previousRef.get();
-			if(prev == null) {
-				return;
-			}
-			if(prev.transactionInfoCount.get() == 0) {
-				curr.previousRef.set(prev.previousRef.get());
-			} else {
-				curr = curr.previousRef.get();
 			}
 		}
 	}
@@ -194,7 +194,6 @@ class TransactionManagerImpl implements TransactionManager {
 		public TransactionInfo(Version version) {
 			super(version.newRelationInfo());
 			this.version = version;
-			this.version.transactionInfoCount.incrementAndGet();
 		}
 		
 		protected boolean hasChanges() {
@@ -222,6 +221,29 @@ class TransactionManagerImpl implements TransactionManager {
 			this.previousRef = new AtomicReference<Version>(previous);
 		}
 		
+		public void clearOld() {
+			Version previous = previousRef.get();
+			if(previous != null) {
+				previous.internalClear(this);
+			}
+		}
+
+		private void internalClear(Version next) {
+			Version previous = previousRef.get();
+			if(previous != null) {
+				previous.internalClear(this);
+			}
+			
+			previous = previousRef.get();
+			if(previous != null) {
+				return;
+			}
+			
+			if(transactionInfoCount.get() == 0) {
+				next.previousRef.set(null);
+			}
+		}
+
 		public Map<BaseRelation, BaseRelationInfo> newRelationInfo() {
 			Map<BaseRelation, BaseRelationInfo> map = new HashMap<BaseRelation, BaseRelationInfo>();
 			for(Map.Entry<BaseRelation, BaseRelationInfo> e : relationInfo.entrySet()) {
