@@ -9,12 +9,14 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.sodeja.lang.IDGenerator;
+
 class TransactionManagerImpl implements TransactionManager {
 	private final Domain domain;
 	private final AtomicReference<Version> versionRef;
 	private final ThreadLocal<TransactionInfo> state = new ThreadLocal<TransactionInfo>();
 	private final ConcurrentLinkedQueue<TransactionInfo> order = new ConcurrentLinkedQueue<TransactionInfo>();
-	private final UUIDGenerator idGen = new UUIDGenerator();
+	private final IDGenerator idGen = new IDGenerator();
 	
 	protected TransactionManagerImpl(Domain domain) {
 		this.domain = domain;
@@ -66,7 +68,7 @@ class TransactionManagerImpl implements TransactionManager {
 			throw exc;
 		}
 		
-		UUID verId = idGen.next();
+		long verId = idGen.next();
 		boolean result = versionRef.compareAndSet(info.version, new Version(verId, info.relationInfo, info.version));
 		if(! result) {
 			Version ver = versionRef.get();
@@ -211,11 +213,11 @@ class TransactionManagerImpl implements TransactionManager {
 	}
 	
 	private class Version extends ValuesDelta {
-		protected final UUID id;
+		protected final long id;
 		protected final AtomicReference<Version> previousRef;
 		protected final AtomicInteger transactionInfoCount = new AtomicInteger();
 		
-		public Version(UUID id, Map<BaseRelation, BaseRelationInfo> relationInfo, Version previous) {
+		public Version(long id, Map<BaseRelation, BaseRelationInfo> relationInfo, Version previous) {
 			super(relationInfo);
 			this.id = id;
 			this.previousRef = new AtomicReference<Version>(previous);
@@ -251,6 +253,11 @@ class TransactionManagerImpl implements TransactionManager {
 				map.put(rel, rel.copyInfo(e.getValue()));
 			}
 			return map;
+		}
+
+		@Override
+		public String toString() {
+			return "V" + id;
 		}
 	}
 	
