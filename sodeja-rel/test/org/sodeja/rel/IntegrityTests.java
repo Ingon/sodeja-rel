@@ -14,54 +14,54 @@ public class IntegrityTests {
 		
 		tx.begin();
 		domain.insertPlain("Department", 
-				"department_id", 0, 
+				"id", 0, 
 				"name", "D0", 
 				"manager", "U0");
 		expectSucc(tx);
 		
 		tx.begin();
 		domain.insertPlain("Department", 
-				"department_id", 1, 
+				"id", 1, 
 				"name", "D1", 
 				"manager", "U1");
 		expectSucc(tx);
 
 		tx.begin();
 		domain.insertPlain("Department", 
-				"department_id", 1, 
+				"id", 1, 
 				"name", "D1_", 
 				"manager", "U1");
 		expectFail(tx, "Department: Primary");
 
 		tx.begin();
 		domain.insertPlain("Department", 
-				"department_id", 2, 
+				"id", 2, 
 				"name", "D2", 
 				"manager", "U2");
 		domain.insertPlain("Department", 
-				"department_id", 2, 
+				"id", 2, 
 				"name", "D2_", 
 				"manager", "U2");
 		expectFail(tx, "Department: Primary");
 
 		tx.begin();
-		domain.updatePlain("Department", Conditions.likeValues("department_id", 0), 
+		domain.updatePlain("Department", Conditions.likeValues("id", 0), 
 				"manager", "M0");
-		domain.updatePlain("Department", Conditions.likeValues("department_id", 1),
+		domain.updatePlain("Department", Conditions.likeValues("id", 1),
 				"manager", "M1");
 		expectSucc(tx);
 		
 		tx.begin();
-		domain.updatePlain("Department", Conditions.likeValues("department_id", 1), 
-				"department_id", 0);
+		domain.updatePlain("Department", Conditions.likeValues("id", 1), 
+				"id", 0);
 		expectFail(tx, "Department: Primary");
 
 		tx.begin();
 		domain.insertPlain("Department", 
-				"department_id", 1, 
+				"id", 1, 
 				"name", "D1_", 
 				"manager", "U1");
-		domain.deletePlain("Department", "department_id", 1);
+		domain.deletePlain("Department", "id", 1);
 		expectSucc(tx);
 	}
 	
@@ -70,32 +70,32 @@ public class IntegrityTests {
 		
 		tx.begin();
 		domain.insertPlain("Department", 
-				"department_id", 0, 
+				"id", 0, 
 				"name", "D0", 
 				"manager", "U0");
 		expectSucc(tx);
 		
 		tx.begin();
 		domain.insertPlain("Employee", 
-				"employee_id", 0, 
+				"id", 0, 
 				"name", "E0", 
 				"department_id", 0);
 		expectSucc(tx);
 
 		tx.begin();
 		domain.insertPlain("Employee", 
-				"employee_id", 1, 
+				"id", 1, 
 				"name", "E0", 
 				"department_id", 1);
 		expectFail(tx, "Employee: Foreign");
 
 		tx.begin();
 		domain.insertPlain("Employee", 
-				"employee_id", 1, 
+				"id", 1, 
 				"name", "E0", 
 				"department_id", 1);
 		domain.insertPlain("Department", 
-				"department_id", 1, 
+				"id", 1, 
 				"name", "D1", 
 				"manager", "U1");
 		expectSucc(tx);
@@ -134,19 +134,18 @@ public class IntegrityTests {
 		Domain domain = new Domain();
 		domain.getTransactionManager().begin();
 		
-		BaseRelation empl = domain.relation("Employee", 
-				new Attribute("employee_id", Types.INT),
-				new Attribute("name", Types.STRING),
-				new Attribute("department_id", Types.INT))
-				.primaryKey("employee_id");
-		
 		BaseRelation dep = domain.relation("Department", 
-				new Attribute("department_id", Types.INT),
+				new Attribute("id", Types.INT),
 				new Attribute("name", Types.STRING),
-				new Attribute("manager", Types.STRING))
-				.primaryKey("department_id");
+				new Attribute("manager", Types.STRING)).
+				primaryKey("id");
 		
-		empl.foreignKey(dep, "department_id");
+		BaseRelation empl = domain.relation("Employee", 
+				new Attribute("id", Types.INT),
+				new Attribute("name", Types.STRING),
+				new Attribute("department_id", Types.INT)).
+				primaryKey("id").
+				foreignKey(dep, "department_id", "id");
 		
 		domain.getTransactionManager().commit();
 		return domain;

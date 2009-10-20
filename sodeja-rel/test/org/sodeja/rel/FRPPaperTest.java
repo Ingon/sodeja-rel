@@ -273,7 +273,7 @@ public class FRPPaperTest {
 				new Attribute("bidderName", name),
 				new Attribute("bidderAddress", address))
 				.primaryKey("address", "offerDate", "bidderName", "bidderAddress")
-				.foreignKey(dom.resolveBase("Property"), "address");
+				.foreignKeyDirect(dom.resolveBase("Property"), "address");
 		
 		dom.relation("Decision",
 				new Attribute("address", address),
@@ -283,7 +283,7 @@ public class FRPPaperTest {
 				new Attribute("decisionDate", Types.DATE),
 				new Attribute("accepted", Types.BOOL))
 				.primaryKey("address", "offerDate", "bidderName", "bidderAddress")
-				.foreignKey(dom.resolveBase("Offer"), "address", "offerDate", "bidderName", "bidderAddress");
+				.foreignKeyDirect(dom.resolveBase("Offer"), "address", "offerDate", "bidderName", "bidderAddress");
 
 		dom.relation("Room",
 				new Attribute("address", address),
@@ -292,15 +292,15 @@ public class FRPPaperTest {
 				new Attribute("breadth", Types.DOUBLE),
 				new Attribute("type", roomType))
 				.primaryKey("address", "roomName")
-				.foreignKey(dom.resolveBase("Property"), "address");
+				.foreignKeyDirect(dom.resolveBase("Property"), "address");
 
 		dom.relation("Floor",
 				new Attribute("address", address),
 				new Attribute("roomName", Types.STRING),
 				new Attribute("floor", Types.INT))
 				.primaryKey("address", "roomName")
-				.foreignKey(dom.resolveBase("Property"), "address")
-				.foreignKey(dom.resolveBase("Room"), "address", "roomName");
+				.foreignKeyDirect(dom.resolveBase("Property"), "address")
+				.foreignKeyDirect(dom.resolveBase("Room"), "address", "roomName");
 		
 		dom.relation("Commission",
 				new Attribute("priceBand", priceBand),
