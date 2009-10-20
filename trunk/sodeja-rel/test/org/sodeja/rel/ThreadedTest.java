@@ -35,7 +35,7 @@ public class ThreadedTest {
 				
 //				System.out.println(getName() + ": Insert: " + i);
 				domain.insertPlain("Department", 
-						"department_id", i, 
+						"id", i, 
 						"name", "fairlyLongName", 
 						"manager", "fairlyLongManagerName");
 				
@@ -47,7 +47,7 @@ public class ThreadedTest {
 
 //				System.out.println(getName() + ": Insert: " + i);
 				domain.insertPlain("Department", 
-						"department_id", i, 
+						"id", i, 
 						"name", "fairlyLongName", 
 						"manager", "fairlyLongManagerName");
 				
@@ -56,7 +56,7 @@ public class ThreadedTest {
 				domain.getTransactionManager().begin();
 
 //				System.out.println(getName() + ": Delete: " + i);
-				domain.deletePlain("Department", "department_id", i); 
+				domain.deletePlain("Department", "id", i); 
 
 				domain.getTransactionManager().commit();
 			}
@@ -105,7 +105,7 @@ public class ThreadedTest {
 		Iterator<Entity> it = rel.select().iterator();
 		if(it.hasNext()) {
 			Entity e = it.next();
-			Attribute idatt = e.getAttributeValue("department_id").attribute;
+			Attribute idatt = e.getAttributeValue("id").attribute;
 			for(Integer i : new Range(0, threads.length * sz)) {
 				if(rel.selectByKey(new Entity(SetUtils.asSet(new AttributeValue(idatt, i)))) == null) {
 					System.out.println("Missing: " + i);
