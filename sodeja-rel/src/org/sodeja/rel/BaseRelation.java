@@ -19,7 +19,6 @@ import org.sodeja.functional.Predicate1;
 import org.sodeja.lang.IDGenerator;
 import org.sodeja.lang.ObjectUtils;
 import org.sodeja.lang.Range;
-import org.sodeja.rel.relations.DerivedRelation;
 import org.sodeja.rel.relations.ProjectRelation;
 import org.sodeja.rel.relations.RestrictRelation;
 
