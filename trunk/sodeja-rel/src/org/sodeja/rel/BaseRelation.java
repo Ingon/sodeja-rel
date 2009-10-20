@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
+import org.sodeja.collections.ArrayUtils;
 import org.sodeja.collections.CollectionUtils;
 import org.sodeja.collections.PersistentMap;
 import org.sodeja.collections.PersistentSet;
@@ -17,6 +18,7 @@ import org.sodeja.functional.Pair;
 import org.sodeja.functional.Predicate1;
 import org.sodeja.lang.IDGenerator;
 import org.sodeja.lang.ObjectUtils;
+import org.sodeja.lang.Range;
 import org.sodeja.rel.relations.ProjectRelation;
 
 public class BaseRelation implements Relation {
@@ -26,7 +28,7 @@ public class BaseRelation implements Relation {
 	protected final IDGenerator idGen = new IDGenerator();
 	
 	protected Set<Attribute> pk = new TreeSet<Attribute>();
-	protected Map<BaseRelation, Set<Attribute>> fks = new HashMap<BaseRelation, Set<Attribute>>();
+	protected Map<BaseRelation, Set<AttributeMapping>> fks = new HashMap<BaseRelation, Set<AttributeMapping>>();
 	protected Set<BaseRelation> references = new HashSet<BaseRelation>();
 
 	protected BaseRelation(Domain domain, String name, Attribute... attributes) {
@@ -42,25 +44,55 @@ public class BaseRelation implements Relation {
 		return this;
 	}
 	
-	public BaseRelation foreignKey(BaseRelation target, String... attributeNames) {
-		Set<Attribute> candidateFk = resolveAttributes(attributeNames);
-		target.reference(this, candidateFk);
-		fks.put(target, candidateFk);
+	public BaseRelation foreignKeyDirect(BaseRelation target, String... attributeNames) {
+		String[] attributeNamesCouples = ArrayUtils.dup(attributeNames);
+		return foreignKey(target, attributeNamesCouples);
+	}
+	
+	public BaseRelation foreignKey(BaseRelation target, String... attributeNamesCouples) {
+		if(attributeNamesCouples.length % 2 != 0) {
+			throw new RuntimeException("Expected foreign - external pk couples");
+		}
+		
+		String[][] tuples = ArrayUtils.unmapTuples(attributeNamesCouples, 2);
+		String[] thisAttributes = tuples[0];
+		String[] foreignAttributes = tuples[1];
+		
+		Set<AttributeMapping> mapping = new HashSet<AttributeMapping>();
+		for(int i : Range.of(thisAttributes)) {
+			Attribute thisAtt = attributeFinder.execute(thisAttributes[i]);
+			Attribute foreignAtt = target.attributeFinder.execute(foreignAttributes[i]);
+			mapping.add(new AttributeMapping(thisAtt, foreignAtt));
+		}
+		
+		target.reference(this, mapping);
+		fks.put(target, mapping);
 		return this;
 	}
 
 	private Set<Attribute> resolveAttributes(String... attributeNames) {
-		Set<Attribute> att = new TreeSet<Attribute>();
+		Set<Attribute> atts = new TreeSet<Attribute>();
 		for(String name : attributeNames) {
-			att.add(attributeFinder.execute(name));
+			Attribute att = attributeFinder.execute(name);
+			if(att == null) {
+				throw new RuntimeException("Unknown attribute name");
+			}
+			atts.add(att);
 		}
-		return att;
+		return atts;
 	}
 
-	private void reference(BaseRelation source, Set<Attribute> candidateFk) {
+	private void reference(BaseRelation source, Set<AttributeMapping> candidateFkMapping) {
+		Set<Attribute> candidateFk = SetUtils.map(candidateFkMapping, new Function1<Attribute, AttributeMapping>() {
+			@Override
+			public Attribute execute(AttributeMapping p) {
+				return p.target;
+			}});
+		
 		if(! this.pk.equals(candidateFk)) {
 			throw new ConstraintViolationException("Foreign key set is not refering to primary key");
 		}
+		
 		references.add(source);
 	}
 	
@@ -161,16 +193,19 @@ public class BaseRelation implements Relation {
 	}
 
 	private Set<AttributeValue> extractValues(Set<Pair<String, Object>> attributeValues) {
-		return (Set<AttributeValue>) 
-			CollectionUtils.map(attributeValues, new TreeSet<AttributeValue>(), new Function1<AttributeValue, Pair<String, Object>>() {
-			@Override
-			public AttributeValue execute(Pair<String, Object> p) {
-				Attribute att = attributeFinder.execute(p.first);
-				if(! att.type.accepts(p.second)) {
-					throw new ConstraintViolationException("Wrong type for " + p.first);
-				}
-				return new AttributeValue(att, p.second);
-			}});
+		return (Set<AttributeValue>) CollectionUtils.map(attributeValues, new TreeSet<AttributeValue>(), 
+				new Function1<AttributeValue, Pair<String, Object>>() {
+					@Override
+					public AttributeValue execute(Pair<String, Object> p) {
+						Attribute att = attributeFinder.execute(p.first);
+						if(att == null) {
+							throw new RuntimeException("Unknown attribute name: " + p.first);
+						}
+						if(! att.type.accepts(p.second)) {
+							throw new ConstraintViolationException("Wrong type for " + p.first);
+						}
+						return new AttributeValue(att, p.second);
+					}});
 	}
 
 	@Override
@@ -238,13 +273,23 @@ public class BaseRelation implements Relation {
 
 	private void checkForeignKeys() {
 		for(Entity e : getInfo().entities) {
-			for(Map.Entry<BaseRelation, Set<Attribute>> rel : fks.entrySet()) {
-				Entity fkEntity = extract(e, rel.getValue());
+			for(Map.Entry<BaseRelation, Set<AttributeMapping>> rel : fks.entrySet()) {
+				Entity fkEntity = makeReferenceEntity(e, rel.getValue());
 				if(rel.getKey().selectByKey(fkEntity) == null) {
 					throw new ConstraintViolationException(name + ": Foreign key to " + rel.getKey().name + " violated");
 				}
 			}
 		}
+	}
+	
+	private Entity makeReferenceEntity(final Entity thisEntity, Set<AttributeMapping> mappings) {
+		Set<AttributeValue> values = SetUtils.map(mappings, new Function1<AttributeValue, AttributeMapping>() {
+			@Override
+			public AttributeValue execute(AttributeMapping p) {
+				AttributeValue val = thisEntity.getAttributeValue(p.source);
+				return new AttributeValue(p.target, val.value);
+			}});
+		return new Entity(values);
 	}
 
 	protected BaseRelationInfo copyInfo(BaseRelationInfo value) {
