@@ -11,6 +11,13 @@ public class IntegrityTests {
 	
 	private static void pkCheck(Domain domain) {
 		TransactionManager tx = domain.getTransactionManager();
+
+		tx.begin();
+		domain.insertPlain("Department", 
+				"id", null, 
+				"name", "D0", 
+				"manager", "U0");
+		expectFail(tx, "Department: Primary");
 		
 		tx.begin();
 		domain.insertPlain("Department", 

@@ -19,7 +19,9 @@ import org.sodeja.functional.Predicate1;
 import org.sodeja.lang.IDGenerator;
 import org.sodeja.lang.ObjectUtils;
 import org.sodeja.lang.Range;
+import org.sodeja.rel.relations.DerivedRelation;
 import org.sodeja.rel.relations.ProjectRelation;
+import org.sodeja.rel.relations.RestrictRelation;
 
 public class BaseRelation implements Relation {
 	protected final Domain domain;
@@ -28,6 +30,9 @@ public class BaseRelation implements Relation {
 	protected final IDGenerator idGen = new IDGenerator();
 	
 	protected Set<Attribute> pk = new TreeSet<Attribute>();
+	protected ProjectRelation pkRelation = null;
+	protected Relation pkNullRelation = null;
+	
 	protected Map<BaseRelation, Set<AttributeMapping>> fks = new HashMap<BaseRelation, Set<AttributeMapping>>();
 	protected Set<BaseRelation> references = new HashSet<BaseRelation>();
 
@@ -41,6 +46,25 @@ public class BaseRelation implements Relation {
 	
 	public BaseRelation primaryKey(String... attributeNames) {
 		pk = resolveAttributes(attributeNames);
+		pkRelation = new ProjectRelation(null, this, SetUtils.map(pk, new Function1<String, Attribute>() {
+			@Override
+			public String execute(Attribute p) {
+				return p.name;
+			}}));
+		
+		Set<Condition> conditions = new HashSet<Condition>();
+		conditions.add(new Condition() {
+			@Override
+			public boolean satisfied(Entity e) {
+				for(Attribute a : pk) {
+					if(e.getAttributeValue(a).value == null) {
+						return true;
+					}
+				}
+				return false;
+			}});
+		pkNullRelation = new RestrictRelation(null, this, conditions);
+		
 		return this;
 	}
 	
@@ -259,13 +283,13 @@ public class BaseRelation implements Relation {
 	}
 
 	private void checkPrimaryKey() {
-		ProjectRelation rel = new ProjectRelation(null, this, SetUtils.map(pk, new Function1<String, Attribute>() {
-			@Override
-			public String execute(Attribute p) {
-				return p.name;
-			}}));
+		Set<Entity> pkNull = pkNullRelation.select();
+		if(! pkNull.isEmpty()) {
+			throw new ConstraintViolationException(name + ": Primary key constraint violated");
+		}
+		
 		PersistentSet<BaseEntity> entities = getInfo().entities;
-		Set<Entity> pkSel = rel.select();
+		Set<Entity> pkSel = pkRelation.select();
 		if(entities.size() != pkSel.size()) {
 			throw new ConstraintViolationException(name + ": Primary key constraint violated");
 		}
