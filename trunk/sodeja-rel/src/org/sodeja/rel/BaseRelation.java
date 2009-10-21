@@ -113,6 +113,48 @@ public class BaseRelation implements Relation {
 		setInfo(currentInfo.copyDelta(entities, entityMap, newPkIndex, newFkIndexes));
 	}
 
+	public void update(Set<Pair<String, Object>> attributeValues, Set<Pair<String, Object>> newAttributeValues) {
+		final Set<AttributeValue> values = extractValues(attributeValues);
+		Set<AttributeValue> pkValues = (Set<AttributeValue>) CollectionUtils.filter(values, new TreeSet<AttributeValue>(), new Predicate1<AttributeValue>() {
+			@Override
+			public Boolean execute(AttributeValue p) {
+				return pk.contains(p.attribute);
+			}});
+		if(pkValues.size() == pk.size()) {
+			Entity pk = new Entity(pkValues);
+			PersistentSet<BaseEntity> entities = getInfo().pkIndex.find(pk);
+			if(pkValues.size() == values.size()) {
+				updateAll(entities, newAttributeValues);
+			} else {
+				values.removeAll(pkValues);
+				
+				update(new Condition() {
+					@Override
+					public boolean satisfied(Entity e) {
+						for(AttributeValue v : values) {
+							if(! ObjectUtils.equalsIfNull(v.value, e.getAttributeValue(v.attribute).value)) {
+								return false;
+							}
+						}
+						return true;
+					}
+				}, newAttributeValues);
+			}
+		} else {
+			update(new Condition() {
+				@Override
+				public boolean satisfied(Entity e) {
+					for(AttributeValue v : values) {
+						if(! ObjectUtils.equalsIfNull(v.value, e.getAttributeValue(v.attribute).value)) {
+							return false;
+						}
+					}
+					return true;
+				}
+			}, newAttributeValues);
+		}
+	}
+	
 	public void update(Condition cond, Set<Pair<String, Object>> attributeValues) {
 		BaseRelationInfo currentInfo = getInfo();
 		
@@ -144,6 +186,35 @@ public class BaseRelation implements Relation {
 		setInfo(currentInfo.copyDelta(entities, entityMap, newPkIndex, newFkIndexes));
 	}
 	
+	private void updateAll(PersistentSet<BaseEntity> targetEntities, Set<Pair<String, Object>> attributeValues) {
+		BaseRelationInfo currentInfo = getInfo();
+		
+		PersistentSet<BaseEntity> entities = currentInfo.entities;
+		PersistentMap<Long, BaseEntity> entityMap = currentInfo.entityMap;
+		
+		BaseRelationIndex newPkIndex = currentInfo.pkIndex;
+		BaseRelationIndexes newFkIndexes = currentInfo.fkIndexes;
+
+		for(BaseEntity e : targetEntities) {
+			entities = entities.removeValue(e);
+			
+			newPkIndex = newPkIndex.delete(e);
+			newFkIndexes = newFkIndexes.delete(e);
+			
+			e = new BaseEntity(e.id, merge(e, attributeValues));
+			
+			entities = entities.addValue(e);
+			entityMap = entityMap.putValue(e.id, e);
+			
+			newPkIndex = newPkIndex.insert(e);
+			newFkIndexes = newFkIndexes.insert(e);
+			
+			currentInfo.updateSet.add(e.id);
+		}
+		
+		setInfo(currentInfo.copyDelta(entities, entityMap, newPkIndex, newFkIndexes));
+	}
+
 	private Set<AttributeValue> merge(BaseEntity e, Set<Pair<String, Object>> attributeValues) {
 		Set<AttributeValue> newValues = new TreeSet<AttributeValue>();
 		newValues.addAll(e.getValues());
@@ -166,19 +237,46 @@ public class BaseRelation implements Relation {
 
 	public void delete(Set<Pair<String, Object>> attributeValues) {
 		final Set<AttributeValue> values = extractValues(attributeValues);
-		delete(new Condition() {
+		Set<AttributeValue> pkValues = (Set<AttributeValue>) CollectionUtils.filter(values, new TreeSet<AttributeValue>(), new Predicate1<AttributeValue>() {
 			@Override
-			public boolean satisfied(Entity e) {
-				for(AttributeValue v : values) {
-					if(! ObjectUtils.equalsIfNull(v.value, e.getAttributeValue(v.attribute).value)) {
-						return false;
+			public Boolean execute(AttributeValue p) {
+				return pk.contains(p.attribute);
+			}});
+		if(pkValues.size() == pk.size()) {
+			Entity pk = new Entity(pkValues);
+			PersistentSet<BaseEntity> entities = getInfo().pkIndex.find(pk);
+			if(pkValues.size() == values.size()) {
+				deleteAll(entities);
+			} else {
+				values.removeAll(pkValues);
+				
+				delete(new Condition() {
+					@Override
+					public boolean satisfied(Entity e) {
+						for(AttributeValue v : values) {
+							if(! ObjectUtils.equalsIfNull(v.value, e.getAttributeValue(v.attribute).value)) {
+								return false;
+							}
+						}
+						return true;
 					}
-				}
-				return true;
+				});
 			}
-		});
+		} else {
+			delete(new Condition() {
+				@Override
+				public boolean satisfied(Entity e) {
+					for(AttributeValue v : values) {
+						if(! ObjectUtils.equalsIfNull(v.value, e.getAttributeValue(v.attribute).value)) {
+							return false;
+						}
+					}
+					return true;
+				}
+			});
+		}
 	}
-	
+
 	public void delete(Condition cond) {
 		BaseRelationInfo currentInfo = getInfo();
 		
@@ -203,6 +301,28 @@ public class BaseRelation implements Relation {
 		setInfo(currentInfo.copyDelta(entities, entityMap, newPkIndex, newFkIndexes));
 	}
 
+	private void deleteAll(Set<BaseEntity> targetEntities) {
+		BaseRelationInfo currentInfo = getInfo();
+		
+		PersistentSet<BaseEntity> entities = currentInfo.entities;
+		PersistentMap<Long, BaseEntity> entityMap = currentInfo.entityMap;
+		
+		BaseRelationIndex newPkIndex = currentInfo.pkIndex;
+		BaseRelationIndexes newFkIndexes = currentInfo.fkIndexes;
+
+		for(BaseEntity e : targetEntities) {
+			entities = entities.removeValue(e);
+			entityMap = entityMap.removeValue(e.id);
+			
+			newPkIndex = newPkIndex.delete(e);
+			newFkIndexes = newFkIndexes.delete(e);
+			
+			currentInfo.deleteSet.add(e.id);
+		}
+		
+		setInfo(currentInfo.copyDelta(entities, entityMap, newPkIndex, newFkIndexes));
+	}
+	
 	private Set<AttributeValue> extractValues(Set<Pair<String, Object>> attributeValues) {
 		return (Set<AttributeValue>) CollectionUtils.map(attributeValues, new TreeSet<AttributeValue>(), 
 				new Function1<AttributeValue, Pair<String, Object>>() {
@@ -224,13 +344,13 @@ public class BaseRelation implements Relation {
 		return Collections.<Entity>unmodifiableSet(getInfo().entities);
 	}
 	
-	private Entity extract(Entity e, Set<Attribute> attributes) {
-		Set<AttributeValue> pkValues = new TreeSet<AttributeValue>();
-		for(Attribute att : attributes) {
-			pkValues.add(e.getAttributeValue(att.name));
-		}
-		return new Entity(pkValues);
-	}
+//	private Entity extract(Entity e, Set<Attribute> attributes) {
+//		Set<AttributeValue> pkValues = new TreeSet<AttributeValue>();
+//		for(Attribute att : attributes) {
+//			pkValues.add(e.getAttributeValue(att.name));
+//		}
+//		return new Entity(pkValues);
+//	}
 
 	protected Entity selectByKey(Entity ent) {
 		OUTER: for(Entity e : getInfo().entities) {
