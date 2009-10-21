@@ -37,6 +37,7 @@ public class SQLThreadedTest {
 			
 			try {
 				PreparedStatement insert = conn.prepareStatement("insert into departments values (?, ?, ?)");
+				PreparedStatement inserte = conn.prepareStatement("insert into employees values (?, ?, ?)");
 				PreparedStatement delete = conn.prepareStatement("delete from departments where id = ?");
 				
 				for(Integer i : insertRange) {
@@ -60,6 +61,15 @@ public class SQLThreadedTest {
 	
 					conn.commit();
 				}
+
+				for(Integer i : insertRange) {
+					inserte.setInt(1, i);
+					inserte.setString(2, "fairlyLongName");
+					inserte.setInt(3, i);
+					inserte.executeUpdate();
+					
+					conn.commit();
+				}
 			} catch(SQLException e) {
 				e.printStackTrace();
 			}
@@ -75,6 +85,8 @@ public class SQLThreadedTest {
 		
 		Connection ccon = DriverManager.getConnection("jdbc:derby:DepartmentTest;create=true");
 		ccon.createStatement().execute("create table departments (id INTEGER NOT NULL PRIMARY KEY, name varchar(255), manager varchar(255))");
+		ccon.createStatement().execute("create table employees (id INTEGER NOT NULL PRIMARY KEY, name varchar(255), department_id INTEGER REFERENCES departments(id))");
+		ccon.close();
 		
 		TestThread[] threads = new TestThread[10];
 		int sz = 100;

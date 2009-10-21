@@ -33,7 +33,6 @@ public class ThreadedTest {
 			for(Integer i : insertRange) {
 				domain.getTransactionManager().begin();
 				
-//				System.out.println(getName() + ": Insert: " + i);
 				domain.insertPlain("Department", 
 						"id", i, 
 						"name", "fairlyLongName", 
@@ -45,7 +44,6 @@ public class ThreadedTest {
 			for(Integer i : insertAnDeleteRange) {
 				domain.getTransactionManager().begin();
 
-//				System.out.println(getName() + ": Insert: " + i);
 				domain.insertPlain("Department", 
 						"id", i, 
 						"name", "fairlyLongName", 
@@ -55,9 +53,19 @@ public class ThreadedTest {
 
 				domain.getTransactionManager().begin();
 
-//				System.out.println(getName() + ": Delete: " + i);
 				domain.deletePlain("Department", "id", i); 
 
+				domain.getTransactionManager().commit();
+			}
+			
+			for(Integer i : insertRange) {
+				domain.getTransactionManager().begin();
+				
+				domain.insertPlain("Employee", 
+						"id", i, 
+						"name", "fairlyLongName", 
+						"department_id", i);
+				
 				domain.getTransactionManager().commit();
 			}
 			
