@@ -52,6 +52,13 @@ class BaseRelationInfo {
 		return new BaseRelationInfo(entities, entityMap, pkIndex, fkIndexes, new TreeSet<Long>(), new TreeSet<Long>(), new TreeSet<Long>());
 	}
 	
+	protected Set<Long> updateSet() {
+		Set<Long> set = new HashSet<Long>();
+		set.addAll(newSet);
+		set.addAll(updateSet);
+		return set;
+	}
+	
 	protected Set<Long> changeSet() {
 		Set<Long> set = new HashSet<Long>();
 		set.addAll(updateSet);

@@ -404,19 +404,31 @@ public class BaseRelation implements Relation {
 	}
 
 	private void checkForeignKeys() {
-		BaseRelationIndexes fkIndexes = getInfo().fkIndexes;
-		for(Map.Entry<BaseRelation, Set<AttributeMapping>> rel : fks.entrySet()) {
-			Set<Attribute> fkAttributes = extractAttributes(rel.getValue(), false);
-			Set<Entity> fkIndex = fkIndexes.indexFor(fkAttributes).index();
-			Set<Entity> pkIndex = rel.getKey().getPkIndex().index();
+		BaseRelationInfo info = getInfo();
+		for(long l : info.updateSet()) {
+			BaseEntity e = info.entityMap.get(l);
 			
-			for(Entity fk : fkIndex) {
-				Entity pk = makeReferenceEntity(fk, rel.getValue());
+			for(Map.Entry<BaseRelation, Set<AttributeMapping>> rel : fks.entrySet()) {
+				Set<Entity> pkIndex = rel.getKey().getPkIndex().index();
+				Entity pk = makeReferenceEntity(e, rel.getValue());
 				if(! pkIndex.contains(pk)) {
 					throw new ConstraintViolationException(name + ": Foreign key to " + rel.getKey().name + " violated");
 				}
 			}
 		}
+//		BaseRelationIndexes fkIndexes = getInfo().fkIndexes;
+//		for(Map.Entry<BaseRelation, Set<AttributeMapping>> rel : fks.entrySet()) {
+//			Set<Attribute> fkAttributes = extractAttributes(rel.getValue(), false);
+//			Set<Entity> fkIndex = fkIndexes.indexFor(fkAttributes).index();
+//			Set<Entity> pkIndex = rel.getKey().getPkIndex().index();
+//			
+//			for(Entity fk : fkIndex) {
+//				Entity pk = makeReferenceEntity(fk, rel.getValue());
+//				if(! pkIndex.contains(pk)) {
+//					throw new ConstraintViolationException(name + ": Foreign key to " + rel.getKey().name + " violated");
+//				}
+//			}
+//		}
 	}
 	
 	private BaseRelationIndex getPkIndex() {
