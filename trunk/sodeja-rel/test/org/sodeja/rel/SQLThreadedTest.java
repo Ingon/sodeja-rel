@@ -70,11 +70,11 @@ public class SQLThreadedTest {
 	
 	public static void main(String[] args) throws Exception {
 //		System.setProperty("derby.system.home", "file://d:/temp");
-//		Class.forName("org.apache.derby.jdbc.EmbeddedDriver");
-		Class.forName("org.postgresql.Driver");
+		Class.forName("org.apache.derby.jdbc.EmbeddedDriver");
+//		Class.forName("org.postgresql.Driver");
 		
-//		Connection ccon = DriverManager.getConnection("jdbc:derby:DepartmentTest;create=true");
-//		ccon.createStatement().execute("create table departments (id INTEGER NOT NULL PRIMARY KEY, name varchar(255), manager varchar(255))");
+		Connection ccon = DriverManager.getConnection("jdbc:derby:DepartmentTest;create=true");
+		ccon.createStatement().execute("create table departments (id INTEGER NOT NULL PRIMARY KEY, name varchar(255), manager varchar(255))");
 		
 		TestThread[] threads = new TestThread[10];
 		int sz = 100;
@@ -82,8 +82,8 @@ public class SQLThreadedTest {
 		
 		for(Integer i : Range.of(threads)) {
 //			Connection connection = DriverManager.getConnection("jdbc:derby:DepartmentTest;user=dbuser;password=dbuserpwd");
-//			Connection connection = DriverManager.getConnection("jdbc:derby:DepartmentTest;");
-			Connection connection = DriverManager.getConnection("jdbc:postgresql://localhost:5432/department_test", "worg", "worg");
+			Connection connection = DriverManager.getConnection("jdbc:derby:DepartmentTest;");
+//			Connection connection = DriverManager.getConnection("jdbc:postgresql://localhost:5432/department_test", "worg", "worg");
 			connection.setAutoCommit(false);
 			threads[i] = new TestThread("TH" + i, connection, new Range(i * sz, (i + 1) * sz), new Range(delBase + i * sz, delBase + (i + 1) * sz));
 			threads[i].start();
