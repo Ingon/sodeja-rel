@@ -11,19 +11,24 @@ class BaseRelationInfo {
 	public final PersistentSet<BaseEntity> entities;
 	public final PersistentMap<Long, BaseEntity> entityMap;
 	
+	public final BaseRelationIndex pkIndex;
+	
 	public final Set<Long> newSet;
 	public final Set<Long> updateSet;
 	public final Set<Long> deleteSet;
 	
 	public BaseRelationInfo() {
-		this(new PersistentSet<BaseEntity>(), new PersistentMap<Long, BaseEntity>(), new TreeSet<Long>(), new TreeSet<Long>(), new TreeSet<Long>());
+		this(new PersistentSet<BaseEntity>(), new PersistentMap<Long, BaseEntity>(), new BaseRelationIndex(new TreeSet<Attribute>()),
+				new TreeSet<Long>(), new TreeSet<Long>(), new TreeSet<Long>());
 	}
 
-	public BaseRelationInfo(PersistentSet<BaseEntity> entities, PersistentMap<Long, BaseEntity> entityMap,  
+	public BaseRelationInfo(PersistentSet<BaseEntity> entities, PersistentMap<Long, BaseEntity> entityMap, 
+			BaseRelationIndex pkIndex,
 			Set<Long> newSet, Set<Long> updateSet, Set<Long> deleteSet) {
 
 		this.entities = entities;
 		this.entityMap = entityMap;
+		this.pkIndex = pkIndex;
 		
 		this.newSet = newSet;
 		this.updateSet = updateSet;
@@ -34,12 +39,12 @@ class BaseRelationInfo {
 		return ! (newSet.isEmpty() && updateSet.isEmpty() && deleteSet.isEmpty());
 	}
 	
-	public BaseRelationInfo copyDelta(PersistentSet<BaseEntity> entities, PersistentMap<Long, BaseEntity> entityMap) {
-		return new BaseRelationInfo(entities, entityMap, this.newSet, this.updateSet, this.deleteSet);
+	public BaseRelationInfo copyDelta(PersistentSet<BaseEntity> entities, PersistentMap<Long, BaseEntity> entityMap, BaseRelationIndex pkIndex) {
+		return new BaseRelationInfo(entities, entityMap, pkIndex, this.newSet, this.updateSet, this.deleteSet);
 	}
 
 	public BaseRelationInfo clearCopy() {
-		return new BaseRelationInfo(entities, entityMap, new TreeSet<Long>(), new TreeSet<Long>(), new TreeSet<Long>());
+		return new BaseRelationInfo(entities, entityMap, pkIndex, new TreeSet<Long>(), new TreeSet<Long>(), new TreeSet<Long>());
 	}
 	
 	protected Set<Long> changeSet() {
@@ -52,12 +57,14 @@ class BaseRelationInfo {
 	protected BaseRelationInfo merge(BaseRelationInfo versionInfo) {
 		PersistentSet<BaseEntity> newEntities = entities;
 		PersistentMap<Long, BaseEntity> newEntityMap = entityMap;
+		BaseRelationIndex newPkIndex = pkIndex;
 		
 		for(Long id : versionInfo.newSet) {
 			BaseEntity e = versionInfo.entityMap.get(id);
 			
 			newEntities = newEntities.addValue(e);
 			newEntityMap = newEntityMap.putValue(id, e);
+			newPkIndex = newPkIndex.insert(e);
 		}
 		
 		for(Long id : versionInfo.updateSet) {
@@ -65,8 +72,11 @@ class BaseRelationInfo {
 			BaseEntity oe = newEntityMap.get(id);
 			
 			newEntities = newEntities.removeValue(oe);
+			newPkIndex.delete(oe);
+			
 			newEntities = newEntities.addValue(ne);
 			newEntityMap = newEntityMap.putValue(id, ne);
+			newPkIndex.insert(ne);
 		}
 		
 		for(Long id : versionInfo.deleteSet) {
@@ -74,10 +84,12 @@ class BaseRelationInfo {
 			if(oe == null) {
 				continue;
 			}
+			
 			newEntities = newEntities.removeValue(oe);
 			newEntityMap = newEntityMap.removeValue(id);
+			newPkIndex = newPkIndex.delete(oe);
 		}
 		
-		return new BaseRelationInfo(newEntities, newEntityMap, this.newSet, this.updateSet, this.deleteSet);
+		return new BaseRelationInfo(newEntities, newEntityMap, newPkIndex, this.newSet, this.updateSet, this.deleteSet);
 	}
 }

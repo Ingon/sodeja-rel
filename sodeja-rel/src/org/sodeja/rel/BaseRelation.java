@@ -19,8 +19,6 @@ import org.sodeja.functional.Predicate1;
 import org.sodeja.lang.IDGenerator;
 import org.sodeja.lang.ObjectUtils;
 import org.sodeja.lang.Range;
-import org.sodeja.rel.relations.ProjectRelation;
-import org.sodeja.rel.relations.RestrictRelation;
 
 public class BaseRelation implements Relation {
 	protected final Domain domain;
@@ -29,8 +27,6 @@ public class BaseRelation implements Relation {
 	protected final IDGenerator idGen = new IDGenerator();
 	
 	protected Set<Attribute> pk = new TreeSet<Attribute>();
-	protected ProjectRelation pkRelation = null;
-	protected Relation pkNullRelation = null;
 	
 	protected Map<BaseRelation, Set<AttributeMapping>> fks = new HashMap<BaseRelation, Set<AttributeMapping>>();
 	protected Set<BaseRelation> references = new HashSet<BaseRelation>();
@@ -45,24 +41,8 @@ public class BaseRelation implements Relation {
 	
 	public BaseRelation primaryKey(String... attributeNames) {
 		pk = resolveAttributes(attributeNames);
-		pkRelation = new ProjectRelation(null, this, SetUtils.map(pk, new Function1<String, Attribute>() {
-			@Override
-			public String execute(Attribute p) {
-				return p.name;
-			}}));
-		
-		Set<Condition> conditions = new HashSet<Condition>();
-		conditions.add(new Condition() {
-			@Override
-			public boolean satisfied(Entity e) {
-				for(Attribute a : pk) {
-					if(e.getAttributeValue(a).value == null) {
-						return true;
-					}
-				}
-				return false;
-			}});
-		pkNullRelation = new RestrictRelation(null, this, conditions);
+		BaseRelationInfo info = getInfo();
+		setInfo(info.copyDelta(info.entities, info.entityMap, new BaseRelationIndex(pk)));
 		
 		return this;
 	}
@@ -125,28 +105,35 @@ public class BaseRelation implements Relation {
 		BaseRelationInfo currentInfo = getInfo();
 		PersistentSet<BaseEntity> entities = currentInfo.entities.addValue(e);
 		PersistentMap<Long, BaseEntity> entityMap = currentInfo.entityMap.putValue(e.id, e);
+		BaseRelationIndex newPkIndex = currentInfo.pkIndex.insert(e);
+		
 		currentInfo.newSet.add(e.id);
 		
-		setInfo(currentInfo.copyDelta(entities, entityMap));
+		setInfo(currentInfo.copyDelta(entities, entityMap, newPkIndex));
 	}
 
 	public void update(Condition cond, Set<Pair<String, Object>> attributeValues) {
 		BaseRelationInfo currentInfo = getInfo();
 		PersistentSet<BaseEntity> entities = currentInfo.entities;
 		PersistentMap<Long, BaseEntity> entityMap = currentInfo.entityMap;
+		BaseRelationIndex newPkIndex = currentInfo.pkIndex;
 
 		for(BaseEntity e : entities) {
 			if(cond.satisfied(e)) {
 				entities = entities.removeValue(e);
+				newPkIndex = newPkIndex.delete(e);
+				
 				e = new BaseEntity(e.id, merge(e, attributeValues));
 				
 				entities = entities.addValue(e);
 				entityMap = entityMap.putValue(e.id, e);
+				newPkIndex = newPkIndex.insert(e);
+				
 				currentInfo.updateSet.add(e.id);
 			}
 		}
 		
-		setInfo(currentInfo.copyDelta(entities, entityMap));
+		setInfo(currentInfo.copyDelta(entities, entityMap, newPkIndex));
 	}
 	
 	private Set<AttributeValue> merge(BaseEntity e, Set<Pair<String, Object>> attributeValues) {
@@ -188,6 +175,7 @@ public class BaseRelation implements Relation {
 		BaseRelationInfo currentInfo = getInfo();
 		PersistentSet<BaseEntity> entities = currentInfo.entities;
 		PersistentMap<Long, BaseEntity> entityMap = currentInfo.entityMap;
+		BaseRelationIndex newPkIndex = currentInfo.pkIndex;
 
 		for(BaseEntity e : entities) {
 			if(cond.satisfied(e)) {
@@ -195,11 +183,13 @@ public class BaseRelation implements Relation {
 				
 				entities = entities.removeValue(e);
 				entityMap = entityMap.removeValue(e.id);
+				newPkIndex = newPkIndex.delete(e);
+				
 				currentInfo.deleteSet.add(e.id);
 			}
 		}
 		
-		setInfo(currentInfo.copyDelta(entities, entityMap));
+		setInfo(currentInfo.copyDelta(entities, entityMap, newPkIndex));
 	}
 	
 	private void checkDeletion(Entity e) {
@@ -275,21 +265,16 @@ public class BaseRelation implements Relation {
 				}});
 		}};
 
-	// TODO checks are uneffective currently
+	// TODO checks are ineffective currently
 	public void integrityChecks() {
 		checkPrimaryKey();
-		checkForeignKeys();
+//		checkForeignKeys();
 	}
 
 	private void checkPrimaryKey() {
-		Set<Entity> pkNull = pkNullRelation.select();
-		if(! pkNull.isEmpty()) {
-			throw new ConstraintViolationException(name + ": Primary key constraint violated");
-		}
-		
 		PersistentSet<BaseEntity> entities = getInfo().entities;
-		Set<Entity> pkSel = pkRelation.select();
-		if(entities.size() != pkSel.size()) {
+		int pkIndexSize = getInfo().pkIndex.size();
+		if(entities.size() != pkIndexSize) {
 			throw new ConstraintViolationException(name + ": Primary key constraint violated");
 		}
 	}

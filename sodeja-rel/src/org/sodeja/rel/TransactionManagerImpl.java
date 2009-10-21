@@ -49,15 +49,7 @@ class TransactionManagerImpl implements TransactionManager {
 			clearInfo(info);
 			return;
 		}
-		while(order.peek() != info) { // if we are not the head, wait for it
-			synchronized(info) { 
-				try {
-					info.wait(100);
-				} catch (InterruptedException e) {
-					e.printStackTrace(); // Hmmm ? rollback?
-				} 
-			}
-		}
+		waitOtherTransactions(info);
 		
 		try {
 			domain.integrityCheck();
@@ -66,6 +58,12 @@ class TransactionManagerImpl implements TransactionManager {
 			throw exc;
 		}
 		
+		commitTransaction(info);
+		
+		clearInfo(info);
+	}
+
+	private void commitTransaction(TransactionInfo info) {
 		long verId = idGen.next();
 		boolean result = versionRef.compareAndSet(info.version, new Version(verId, info.relationInfo, info.version));
 		if(! result) {
@@ -82,8 +80,18 @@ class TransactionManagerImpl implements TransactionManager {
 			}
 			newVersion.clearOld();
 		}
-		
-		clearInfo(info);
+	}
+
+	private void waitOtherTransactions(TransactionInfo info) {
+		while(order.peek() != info) { // if we are not the head, wait for it
+			synchronized(info) { 
+				try {
+					info.wait(100);
+				} catch (InterruptedException e) {
+					e.printStackTrace(); // Hmmm ? rollback?
+				} 
+			}
+		}
 	}
 
 	private void clearInfo(TransactionInfo info) {
