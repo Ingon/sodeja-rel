@@ -25,6 +25,7 @@ public class BaseRelation implements Relation {
 	protected final Domain domain;
 	protected final String name;
 	protected final Set<Attribute> attributes;
+	protected final Map<String, Attribute> attributesMap;
 	protected final IDGenerator idGen = new IDGenerator();
 	
 	protected Set<Attribute> pk = new TreeSet<Attribute>();
@@ -33,7 +34,13 @@ public class BaseRelation implements Relation {
 	protected BaseRelation(Domain domain, String name, Attribute... attributes) {
 		this.domain = domain;
 		this.name = name;
+		
 		this.attributes = new TreeSet<Attribute>(Arrays.asList(attributes));
+		this.attributesMap = CollectionUtils.mappedValues(this.attributes, new Function1<String, Attribute>() {
+			@Override
+			public String execute(Attribute p) {
+				return p.name;
+			}});
 		
 		setInfo(new BaseRelationInfo());
 	}
@@ -382,11 +389,7 @@ public class BaseRelation implements Relation {
 	private Function1<Attribute, String> attributeFinder = new Function1<Attribute, String>() {
 		@Override
 		public Attribute execute(final String att) {
-			return CollectionUtils.find(attributes, new Predicate1<Attribute>() {
-				@Override
-				public Boolean execute(Attribute p) {
-					return p.name.equals(att);
-				}});
+			return attributesMap.get(att);
 		}};
 
 	// TODO checks are ineffective currently
@@ -416,47 +419,11 @@ public class BaseRelation implements Relation {
 				}
 			}
 		}
-//		BaseRelationIndexes fkIndexes = getInfo().fkIndexes;
-//		for(Map.Entry<BaseRelation, Set<AttributeMapping>> rel : fks.entrySet()) {
-//			Set<Attribute> fkAttributes = extractAttributes(rel.getValue(), false);
-//			Set<Entity> fkIndex = fkIndexes.indexFor(fkAttributes).index();
-//			Set<Entity> pkIndex = rel.getKey().getPkIndex().index();
-//			
-//			for(Entity fk : fkIndex) {
-//				Entity pk = makeReferenceEntity(fk, rel.getValue());
-//				if(! pkIndex.contains(pk)) {
-//					throw new ConstraintViolationException(name + ": Foreign key to " + rel.getKey().name + " violated");
-//				}
-//			}
-//		}
 	}
 	
 	private BaseRelationIndex getPkIndex() {
 		return getInfo().pkIndex;
 	}
-
-	private Set<Attribute> extractAttributes(Set<AttributeMapping> mapping, final boolean pk) {
-		return SetUtils.map(mapping, new Function1<Attribute, AttributeMapping>() {
-			@Override
-			public Attribute execute(AttributeMapping p) {
-				if(pk) {
-					return p.target;
-				} else {
-					return p.source;
-				}
-			}});
-	}
-	
-//	private void checkForeignKeys() {
-//		for(Entity e : getInfo().entities) {
-//			for(Map.Entry<BaseRelation, Set<AttributeMapping>> rel : fks.entrySet()) {
-//				Entity fkEntity = makeReferenceEntity(e, rel.getValue());
-//				if(rel.getKey().selectByPk(fkEntity) == null) {
-//					throw new ConstraintViolationException(name + ": Foreign key to " + rel.getKey().name + " violated");
-//				}
-//			}
-//		}
-//	}
 	
 	private Entity makeReferenceEntity(final Entity thisEntity, Set<AttributeMapping> mappings) {
 		Set<AttributeValue> values = SetUtils.map(mappings, new Function1<AttributeValue, AttributeMapping>() {
@@ -471,5 +438,4 @@ public class BaseRelation implements Relation {
 	protected BaseRelationInfo copyInfo(BaseRelationInfo value) {
 		return value.clearCopy();
 	}
-
 }
