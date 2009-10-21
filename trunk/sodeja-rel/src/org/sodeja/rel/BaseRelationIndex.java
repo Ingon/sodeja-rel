@@ -7,8 +7,8 @@ import org.sodeja.collections.PersistentMap;
 import org.sodeja.collections.PersistentSet;
 
 class BaseRelationIndex {
-	private final Set<Attribute> attributes;
-	private final PersistentMap<Entity, PersistentSet<BaseEntity>> index;
+	public final Set<Attribute> attributes;
+	public final PersistentMap<Entity, PersistentSet<BaseEntity>> index;
 	
 	public BaseRelationIndex(Set<Attribute> attributes) {
 		this.attributes = attributes;
@@ -70,5 +70,26 @@ class BaseRelationIndex {
 			pkValues.add(e.getAttributeValue(att.name));
 		}
 		return new Entity(pkValues);
+	}
+
+	public PersistentSet<BaseEntity> find(Entity pk) {
+		return index.get(pk);
+	}
+	
+	public Set<Entity> index() {
+		return index.keySet();
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if(! (obj instanceof BaseRelationIndex)) {
+			return false;
+		}
+		return this.attributes.equals(((BaseRelationIndex) obj).attributes);
+	}
+
+	@Override
+	public int hashCode() {
+		return this.attributes.hashCode();
 	}
 }

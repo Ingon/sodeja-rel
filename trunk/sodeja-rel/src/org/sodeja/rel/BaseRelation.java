@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -27,9 +28,7 @@ public class BaseRelation implements Relation {
 	protected final IDGenerator idGen = new IDGenerator();
 	
 	protected Set<Attribute> pk = new TreeSet<Attribute>();
-	
 	protected Map<BaseRelation, Set<AttributeMapping>> fks = new HashMap<BaseRelation, Set<AttributeMapping>>();
-	protected Set<BaseRelation> references = new HashSet<BaseRelation>();
 
 	protected BaseRelation(Domain domain, String name, Attribute... attributes) {
 		this.domain = domain;
@@ -42,7 +41,7 @@ public class BaseRelation implements Relation {
 	public BaseRelation primaryKey(String... attributeNames) {
 		pk = resolveAttributes(attributeNames);
 		BaseRelationInfo info = getInfo();
-		setInfo(info.copyDelta(info.entities, info.entityMap, new BaseRelationIndex(pk)));
+		setInfo(info.copyDelta(info.entities, info.entityMap, new BaseRelationIndex(pk), info.fkIndexes));
 		
 		return this;
 	}
@@ -61,15 +60,28 @@ public class BaseRelation implements Relation {
 		String[] thisAttributes = tuples[0];
 		String[] foreignAttributes = tuples[1];
 		
+		Set<Attribute> fkIndexAttributes = new TreeSet<Attribute>();
+		Set<Attribute> targetPkCandidate = new TreeSet<Attribute>();
+		
 		Set<AttributeMapping> mapping = new HashSet<AttributeMapping>();
 		for(int i : Range.of(thisAttributes)) {
 			Attribute thisAtt = attributeFinder.execute(thisAttributes[i]);
+			fkIndexAttributes.add(thisAtt);
+			
 			Attribute foreignAtt = target.attributeFinder.execute(foreignAttributes[i]);
+			targetPkCandidate.add(foreignAtt);
+			
 			mapping.add(new AttributeMapping(thisAtt, foreignAtt));
 		}
 		
-		target.reference(this, mapping);
+		if(! target.pk.equals(targetPkCandidate)) {
+			throw new ConstraintViolationException("Foreign key set is not refering to primary key");
+		}
 		fks.put(target, mapping);
+		
+		BaseRelationInfo info = getInfo();
+		setInfo(info.copyDelta(info.entities, info.entityMap, info.pkIndex, info.fkIndexes.addIndex(new BaseRelationIndex(fkIndexAttributes))));
+		
 		return this;
 	}
 
@@ -85,55 +97,51 @@ public class BaseRelation implements Relation {
 		return atts;
 	}
 
-	private void reference(BaseRelation source, Set<AttributeMapping> candidateFkMapping) {
-		Set<Attribute> candidateFk = SetUtils.map(candidateFkMapping, new Function1<Attribute, AttributeMapping>() {
-			@Override
-			public Attribute execute(AttributeMapping p) {
-				return p.target;
-			}});
-		
-		if(! this.pk.equals(candidateFk)) {
-			throw new ConstraintViolationException("Foreign key set is not refering to primary key");
-		}
-		
-		references.add(source);
-	}
-	
 	public void insert(Set<Pair<String, Object>> attributeValues) {
 		BaseEntity e = new BaseEntity(idGen.next(), extractValues(attributeValues));
 		
 		BaseRelationInfo currentInfo = getInfo();
+		
 		PersistentSet<BaseEntity> entities = currentInfo.entities.addValue(e);
 		PersistentMap<Long, BaseEntity> entityMap = currentInfo.entityMap.putValue(e.id, e);
+		
 		BaseRelationIndex newPkIndex = currentInfo.pkIndex.insert(e);
+		BaseRelationIndexes newFkIndexes = currentInfo.fkIndexes.insert(e);
 		
 		currentInfo.newSet.add(e.id);
 		
-		setInfo(currentInfo.copyDelta(entities, entityMap, newPkIndex));
+		setInfo(currentInfo.copyDelta(entities, entityMap, newPkIndex, newFkIndexes));
 	}
 
 	public void update(Condition cond, Set<Pair<String, Object>> attributeValues) {
 		BaseRelationInfo currentInfo = getInfo();
+		
 		PersistentSet<BaseEntity> entities = currentInfo.entities;
 		PersistentMap<Long, BaseEntity> entityMap = currentInfo.entityMap;
+		
 		BaseRelationIndex newPkIndex = currentInfo.pkIndex;
+		BaseRelationIndexes newFkIndexes = currentInfo.fkIndexes;
 
 		for(BaseEntity e : entities) {
 			if(cond.satisfied(e)) {
 				entities = entities.removeValue(e);
+				
 				newPkIndex = newPkIndex.delete(e);
+				newFkIndexes = newFkIndexes.delete(e);
 				
 				e = new BaseEntity(e.id, merge(e, attributeValues));
 				
 				entities = entities.addValue(e);
 				entityMap = entityMap.putValue(e.id, e);
+				
 				newPkIndex = newPkIndex.insert(e);
+				newFkIndexes = newFkIndexes.insert(e);
 				
 				currentInfo.updateSet.add(e.id);
 			}
 		}
 		
-		setInfo(currentInfo.copyDelta(entities, entityMap, newPkIndex));
+		setInfo(currentInfo.copyDelta(entities, entityMap, newPkIndex, newFkIndexes));
 	}
 	
 	private Set<AttributeValue> merge(BaseEntity e, Set<Pair<String, Object>> attributeValues) {
@@ -173,36 +181,26 @@ public class BaseRelation implements Relation {
 	
 	public void delete(Condition cond) {
 		BaseRelationInfo currentInfo = getInfo();
+		
 		PersistentSet<BaseEntity> entities = currentInfo.entities;
 		PersistentMap<Long, BaseEntity> entityMap = currentInfo.entityMap;
+		
 		BaseRelationIndex newPkIndex = currentInfo.pkIndex;
+		BaseRelationIndexes newFkIndexes = currentInfo.fkIndexes;
 
 		for(BaseEntity e : entities) {
 			if(cond.satisfied(e)) {
-				checkDeletion(e);
-				
 				entities = entities.removeValue(e);
 				entityMap = entityMap.removeValue(e.id);
+				
 				newPkIndex = newPkIndex.delete(e);
+				newFkIndexes = newFkIndexes.delete(e);
 				
 				currentInfo.deleteSet.add(e.id);
 			}
 		}
 		
-		setInfo(currentInfo.copyDelta(entities, entityMap, newPkIndex));
-	}
-	
-	private void checkDeletion(Entity e) {
-		for(BaseRelation rel : references) {
-			Entity pkEntity = extract(e, pk);
-			if(rel.refer(pkEntity)) {
-				throw new ConstraintViolationException("Foreign key from " + rel.name + " relation violated");
-			}
-		}
-	}
-
-	private boolean refer(Entity pkEntity) {
-		return selectByKey(pkEntity) != null;
+		setInfo(currentInfo.copyDelta(entities, entityMap, newPkIndex, newFkIndexes));
 	}
 
 	private Set<AttributeValue> extractValues(Set<Pair<String, Object>> attributeValues) {
@@ -234,9 +232,9 @@ public class BaseRelation implements Relation {
 		return new Entity(pkValues);
 	}
 
-	protected Entity selectByKey(Entity pk) {
+	protected Entity selectByKey(Entity ent) {
 		OUTER: for(Entity e : getInfo().entities) {
-			for(AttributeValue pkVal : pk.getValues()) {
+			for(AttributeValue pkVal : ent.getValues()) {
 				Object eval = e.getValue(pkVal.attribute.name);
 				if(! ObjectUtils.equalsIfNull(pkVal.value, eval)) {
 					continue OUTER;
@@ -247,6 +245,20 @@ public class BaseRelation implements Relation {
 		return null;
 	}
 
+	protected Entity selectByPk(Entity pk) {
+		BaseRelationIndex pkIndex = getInfo().pkIndex;
+		PersistentSet<BaseEntity> e = pkIndex.find(pk);
+		if(e == null || e.isEmpty()) {
+			return null;
+		} else {
+			Iterator<BaseEntity> ite = e.iterator();
+			if(! ite.hasNext()) {
+				throw new RuntimeException("Set is not empty but the iterator does not return elemens ?");
+			}
+			return ite.next();
+		}
+	}
+	
 	private BaseRelationInfo getInfo() {
 		return domain.manager.get(this);
 	}
@@ -268,7 +280,7 @@ public class BaseRelation implements Relation {
 	// TODO checks are ineffective currently
 	public void integrityChecks() {
 		checkPrimaryKey();
-//		checkForeignKeys();
+		checkForeignKeys();
 	}
 
 	private void checkPrimaryKey() {
@@ -280,15 +292,47 @@ public class BaseRelation implements Relation {
 	}
 
 	private void checkForeignKeys() {
-		for(Entity e : getInfo().entities) {
-			for(Map.Entry<BaseRelation, Set<AttributeMapping>> rel : fks.entrySet()) {
-				Entity fkEntity = makeReferenceEntity(e, rel.getValue());
-				if(rel.getKey().selectByKey(fkEntity) == null) {
+		BaseRelationIndexes fkIndexes = getInfo().fkIndexes;
+		for(Map.Entry<BaseRelation, Set<AttributeMapping>> rel : fks.entrySet()) {
+			Set<Attribute> fkAttributes = extractAttributes(rel.getValue(), false);
+			Set<Entity> fkIndex = fkIndexes.indexFor(fkAttributes).index();
+			Set<Entity> pkIndex = rel.getKey().getPkIndex().index();
+			
+			for(Entity fk : fkIndex) {
+				Entity pk = makeReferenceEntity(fk, rel.getValue());
+				if(! pkIndex.contains(pk)) {
 					throw new ConstraintViolationException(name + ": Foreign key to " + rel.getKey().name + " violated");
 				}
 			}
 		}
 	}
+	
+	private BaseRelationIndex getPkIndex() {
+		return getInfo().pkIndex;
+	}
+
+	private Set<Attribute> extractAttributes(Set<AttributeMapping> mapping, final boolean pk) {
+		return SetUtils.map(mapping, new Function1<Attribute, AttributeMapping>() {
+			@Override
+			public Attribute execute(AttributeMapping p) {
+				if(pk) {
+					return p.target;
+				} else {
+					return p.source;
+				}
+			}});
+	}
+	
+//	private void checkForeignKeys() {
+//		for(Entity e : getInfo().entities) {
+//			for(Map.Entry<BaseRelation, Set<AttributeMapping>> rel : fks.entrySet()) {
+//				Entity fkEntity = makeReferenceEntity(e, rel.getValue());
+//				if(rel.getKey().selectByPk(fkEntity) == null) {
+//					throw new ConstraintViolationException(name + ": Foreign key to " + rel.getKey().name + " violated");
+//				}
+//			}
+//		}
+//	}
 	
 	private Entity makeReferenceEntity(final Entity thisEntity, Set<AttributeMapping> mappings) {
 		Set<AttributeValue> values = SetUtils.map(mappings, new Function1<AttributeValue, AttributeMapping>() {
