@@ -343,14 +343,6 @@ public class BaseRelation implements Relation {
 	public Set<Entity> select() {
 		return Collections.<Entity>unmodifiableSet(getInfo().entities);
 	}
-	
-//	private Entity extract(Entity e, Set<Attribute> attributes) {
-//		Set<AttributeValue> pkValues = new TreeSet<AttributeValue>();
-//		for(Attribute att : attributes) {
-//			pkValues.add(e.getAttributeValue(att.name));
-//		}
-//		return new Entity(pkValues);
-//	}
 
 	protected Entity selectByKey(Entity ent) {
 		OUTER: for(Entity e : getInfo().entities) {
