@@ -1,6 +1,8 @@
 package org.sodeja.rel;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -18,15 +20,17 @@ class BaseRelationInfo {
 	public final Set<Long> updateSet;
 	public final Set<Long> deleteSet;
 	
+	public final Map<BaseRelation, Set<Long>> starvingEntities; 
+	
 	public BaseRelationInfo() {
 		this(new PersistentSet<BaseEntity>(), new PersistentMap<Long, BaseEntity>(), 
 				new BaseRelationIndex(new TreeSet<Attribute>()), new BaseRelationIndexes(),
-				new TreeSet<Long>(), new TreeSet<Long>(), new TreeSet<Long>());
+				new TreeSet<Long>(), new TreeSet<Long>(), new TreeSet<Long>(), new HashMap<BaseRelation, Set<Long>>());
 	}
 
 	public BaseRelationInfo(PersistentSet<BaseEntity> entities, PersistentMap<Long, BaseEntity> entityMap, 
 			BaseRelationIndex pkIndex, BaseRelationIndexes fkIndexes,
-			Set<Long> newSet, Set<Long> updateSet, Set<Long> deleteSet) {
+			Set<Long> newSet, Set<Long> updateSet, Set<Long> deleteSet, Map<BaseRelation, Set<Long>> starvedEntities) {
 
 		this.entities = entities;
 		this.entityMap = entityMap;
@@ -37,6 +41,8 @@ class BaseRelationInfo {
 		this.newSet = newSet;
 		this.updateSet = updateSet;
 		this.deleteSet = deleteSet;
+		
+		this.starvingEntities = starvedEntities;
 	}
 	
 	public boolean hasChanges() {
@@ -45,11 +51,12 @@ class BaseRelationInfo {
 	
 	public BaseRelationInfo copyDelta(PersistentSet<BaseEntity> entities, PersistentMap<Long, BaseEntity> entityMap, 
 			BaseRelationIndex pkIndex, BaseRelationIndexes fkIndexes) {
-		return new BaseRelationInfo(entities, entityMap, pkIndex, fkIndexes, this.newSet, this.updateSet, this.deleteSet);
+		return new BaseRelationInfo(entities, entityMap, pkIndex, fkIndexes, this.newSet, this.updateSet, this.deleteSet, this.starvingEntities);
 	}
 
 	public BaseRelationInfo clearCopy() {
-		return new BaseRelationInfo(entities, entityMap, pkIndex, fkIndexes, new TreeSet<Long>(), new TreeSet<Long>(), new TreeSet<Long>());
+		return new BaseRelationInfo(entities, entityMap, pkIndex, fkIndexes, 
+				new TreeSet<Long>(), new TreeSet<Long>(), new TreeSet<Long>(), new HashMap<BaseRelation, Set<Long>>());
 	}
 	
 	protected Set<Long> updateSet() {
@@ -111,6 +118,7 @@ class BaseRelationInfo {
 			newFkIndexes = newFkIndexes.delete(oe);
 		}
 		
-		return new BaseRelationInfo(newEntities, newEntityMap, newPkIndex, newFkIndexes, this.newSet, this.updateSet, this.deleteSet);
+		return new BaseRelationInfo(newEntities, newEntityMap, newPkIndex, newFkIndexes, 
+				this.newSet, this.updateSet, this.deleteSet, this.starvingEntities);
 	}
 }

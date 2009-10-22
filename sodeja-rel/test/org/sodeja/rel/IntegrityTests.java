@@ -102,21 +102,21 @@ public class IntegrityTests {
 
 		tx.begin();
 		domain.insertPlain("Department", 
-				"id", 1, 
-				"name", "D1", 
-				"manager", "U1");
+				"id", 2, 
+				"name", "D2", 
+				"manager", "U2");
 		expectSucc(tx);
 
 		tx.begin();
 		domain.insertPlain("Employee", 
-				"id", 1, 
+				"id", 2, 
 				"name", "E1", 
-				"department_id", 0);
+				"department_id", 2);
 		expectSucc(tx);
 
 		tx.begin();
 		
-		domain.deletePlain("Department", "id", 1);
+		domain.deletePlain("Department", "id", 2);
 		expectFail(tx, "Employee: Foreign");
 	}
 

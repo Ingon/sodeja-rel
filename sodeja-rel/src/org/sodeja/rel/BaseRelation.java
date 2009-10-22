@@ -21,7 +21,7 @@ import org.sodeja.lang.IDGenerator;
 import org.sodeja.lang.ObjectUtils;
 import org.sodeja.lang.Range;
 
-public class BaseRelation implements Relation {
+public class BaseRelation implements Relation, BaseRelationListener {
 	protected final Domain domain;
 	protected final String name;
 	protected final Set<Attribute> attributes;
@@ -30,6 +30,9 @@ public class BaseRelation implements Relation {
 	
 	protected Set<Attribute> pk = new TreeSet<Attribute>();
 	protected Map<BaseRelation, Set<AttributeMapping>> fks = new HashMap<BaseRelation, Set<AttributeMapping>>();
+	protected Map<BaseRelation, Set<Attribute>> fkIndexes = new HashMap<BaseRelation, Set<Attribute>>();
+	
+	protected final Set<BaseRelationListener> listeners = new HashSet<BaseRelationListener>();
 
 	protected BaseRelation(Domain domain, String name, Attribute... attributes) {
 		this.domain = domain;
@@ -84,7 +87,10 @@ public class BaseRelation implements Relation {
 		if(! target.pk.equals(targetPkCandidate)) {
 			throw new ConstraintViolationException("Foreign key set is not refering to primary key");
 		}
+		
 		fks.put(target, mapping);
+		fkIndexes.put(target, fkIndexAttributes);
+		target.listeners.add(this);
 		
 		BaseRelationInfo info = getInfo();
 		setInfo(info.copyDelta(info.entities, info.entityMap, info.pkIndex, info.fkIndexes.addIndex(new BaseRelationIndex(fkIndexAttributes))));
@@ -118,6 +124,40 @@ public class BaseRelation implements Relation {
 		currentInfo.newSet.add(e.id);
 		
 		setInfo(currentInfo.copyDelta(entities, entityMap, newPkIndex, newFkIndexes));
+		
+		checkForeignKeys(currentInfo, e);
+		
+		for(BaseRelationListener l : listeners) {
+			l.inserted(this, e);
+		}
+	}
+
+	private void removeFromStarving(BaseRelationInfo currentInfo, BaseEntity e) {
+		for(Iterator<Map.Entry<BaseRelation, Set<Long>>> ite = currentInfo.starvingEntities.entrySet().iterator(); ite.hasNext(); ) {
+			Map.Entry<BaseRelation, Set<Long>> en = ite.next();
+			Set<Long> starvingIds = en.getValue();
+			if(starvingIds == null || starvingIds.isEmpty()) {
+				continue;
+			}
+			if(starvingIds.remove(e.id) && starvingIds.isEmpty()) {
+				ite.remove();
+			}
+		}
+	}
+	
+	private void checkForeignKeys(BaseRelationInfo currentInfo, BaseEntity e) {
+		for (Map.Entry<BaseRelation, Set<AttributeMapping>> rel : fks.entrySet()) {
+			Set<Entity> pkIndex = rel.getKey().getPkIndex().index();
+			Entity pk = makeReferenceEntity(e, rel.getValue());
+			if (! pkIndex.contains(pk)) {
+				Set<Long> starvingIds = currentInfo.starvingEntities.get(rel.getKey());
+				if(starvingIds == null) {
+					starvingIds = new HashSet<Long>();
+					currentInfo.starvingEntities.put(rel.getKey(), starvingIds);
+				}
+				starvingIds.add(e.id);
+			}
+		}
 	}
 
 	public void update(Set<Pair<String, Object>> attributeValues, Set<Pair<String, Object>> newAttributeValues) {
@@ -178,6 +218,7 @@ public class BaseRelation implements Relation {
 				newPkIndex = newPkIndex.delete(e);
 				newFkIndexes = newFkIndexes.delete(e);
 				
+				BaseEntity oe = e;
 				e = new BaseEntity(e.id, merge(e, attributeValues));
 				
 				entities = entities.addValue(e);
@@ -187,6 +228,12 @@ public class BaseRelation implements Relation {
 				newFkIndexes = newFkIndexes.insert(e);
 				
 				currentInfo.updateSet.add(e.id);
+				
+				removeFromStarving(currentInfo, oe);
+				checkForeignKeys(currentInfo, e);
+				for(BaseRelationListener l : listeners) {
+					l.updated(this, oe, e);
+				}
 			}
 		}
 		
@@ -208,6 +255,7 @@ public class BaseRelation implements Relation {
 			newPkIndex = newPkIndex.delete(e);
 			newFkIndexes = newFkIndexes.delete(e);
 			
+			BaseEntity oe = e;
 			e = new BaseEntity(e.id, merge(e, attributeValues));
 			
 			entities = entities.addValue(e);
@@ -217,6 +265,12 @@ public class BaseRelation implements Relation {
 			newFkIndexes = newFkIndexes.insert(e);
 			
 			currentInfo.updateSet.add(e.id);
+
+			removeFromStarving(currentInfo, oe);
+			checkForeignKeys(currentInfo, e);
+			for(BaseRelationListener l : listeners) {
+				l.updated(this, oe, e);
+			}
 		}
 		
 		setInfo(currentInfo.copyDelta(entities, entityMap, newPkIndex, newFkIndexes));
@@ -302,6 +356,11 @@ public class BaseRelation implements Relation {
 				newFkIndexes = newFkIndexes.delete(e);
 				
 				currentInfo.deleteSet.add(e.id);
+				
+				removeFromStarving(currentInfo, e);
+				for(BaseRelationListener l : listeners) {
+					l.deleted(this, e);
+				}
 			}
 		}
 		
@@ -325,6 +384,11 @@ public class BaseRelation implements Relation {
 			newFkIndexes = newFkIndexes.delete(e);
 			
 			currentInfo.deleteSet.add(e.id);
+			
+			removeFromStarving(currentInfo, e);
+			for(BaseRelationListener l : listeners) {
+				l.deleted(this, e);
+			}
 		}
 		
 		setInfo(currentInfo.copyDelta(entities, entityMap, newPkIndex, newFkIndexes));
@@ -408,15 +472,9 @@ public class BaseRelation implements Relation {
 
 	private void checkForeignKeys() {
 		BaseRelationInfo info = getInfo();
-		for(long l : info.updateSet()) {
-			BaseEntity e = info.entityMap.get(l);
-			
-			for(Map.Entry<BaseRelation, Set<AttributeMapping>> rel : fks.entrySet()) {
-				Set<Entity> pkIndex = rel.getKey().getPkIndex().index();
-				Entity pk = makeReferenceEntity(e, rel.getValue());
-				if(! pkIndex.contains(pk)) {
-					throw new ConstraintViolationException(name + ": Foreign key to " + rel.getKey().name + " violated");
-				}
+		if(! info.starvingEntities.isEmpty()) {
+			for(Map.Entry<BaseRelation, Set<Long>> e : info.starvingEntities.entrySet()) {
+				throw new ConstraintViolationException(name + ": Foreign key to " + e.getKey().name + " violated");
 			}
 		}
 	}
@@ -437,5 +495,70 @@ public class BaseRelation implements Relation {
 
 	protected BaseRelationInfo copyInfo(BaseRelationInfo value) {
 		return value.clearCopy();
+	}
+
+	@Override
+	public void inserted(BaseRelation relation, BaseEntity entity) {
+		BaseRelationInfo info = getInfo();
+		Set<Long> starvingIds = info.starvingEntities.get(relation);
+		if(starvingIds == null || starvingIds.isEmpty()) {
+			return;
+		}
+		
+		Entity fkEntity = makeFkEntity(relation, entity);
+		for(Iterator<Long> ite = starvingIds.iterator(); ite.hasNext(); ) {
+			Long l = ite.next();
+			if(subsetOf(info.entityMap.get(l), fkEntity)) {
+				ite.remove();
+			}
+		}
+		if(starvingIds.isEmpty()) {
+			info.starvingEntities.remove(relation);
+		}
+	}
+
+	@Override
+	public void updated(BaseRelation relation, BaseEntity oldEntity, BaseEntity newEntity) {
+		deleted(relation, oldEntity);
+		inserted(relation, newEntity);
+	}
+
+	@Override
+	public void deleted(BaseRelation relation, BaseEntity entity) {
+		BaseRelationInfo info = getInfo();
+		Set<Long> starvingIds = info.starvingEntities.get(relation);
+		
+		BaseRelationIndex index = info.fkIndexes.indexFor(fkIndexes.get(relation));
+		Entity fkOldEntity = makeFkEntity(relation, entity);
+		Set<BaseEntity> oldEntities = index.find(fkOldEntity);
+		if(oldEntities != null) {
+			if(starvingIds == null) {
+				starvingIds = new HashSet<Long>();
+				info.starvingEntities.put(relation, starvingIds);
+			}
+			
+			for(BaseEntity e : oldEntities) {
+				starvingIds.add(e.id);
+			}
+		}
+	}
+
+	private Entity makeFkEntity(BaseRelation relation, BaseEntity entity) {
+		Set<AttributeMapping> mapping = fks.get(relation);
+		Set<AttributeValue> values = new TreeSet<AttributeValue>();
+		for(AttributeMapping m : mapping) {
+			values.add(new AttributeValue(m.source, entity.getAttributeValue(m.target).value));
+		}
+		return new Entity(values);
+	}
+	
+	private boolean subsetOf(BaseEntity baseEntity, Entity fkEntity) {
+		for(AttributeValue fv : fkEntity.values) {
+			AttributeValue v = baseEntity.getAttributeValue(fv.attribute);
+			if(! ObjectUtils.equalsIfNull(fv.value, v.value)) {
+				return false;
+			}
+		}
+		return true;
 	}
 }

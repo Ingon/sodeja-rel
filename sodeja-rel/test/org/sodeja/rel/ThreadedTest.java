@@ -77,7 +77,7 @@ public class ThreadedTest {
 		Domain domain = IntegrityTests.createDomain();
 		
 		TestThread[] threads = new TestThread[10];
-		int sz = 100;
+		int sz = 200;
 		int delBase = sz * threads.length;
 		
 		for(Integer i : Range.of(threads)) {
