@@ -410,11 +410,6 @@ public class BaseRelation implements Relation, BaseRelationListener {
 					}});
 	}
 
-	@Override
-	public Set<Entity> select() {
-		return Collections.<Entity>unmodifiableSet(getInfo().entities);
-	}
-
 	protected Entity selectByKey(Entity ent) {
 		OUTER: for(Entity e : getInfo().entities) {
 			for(AttributeValue pkVal : ent.getValues()) {
@@ -560,5 +555,10 @@ public class BaseRelation implements Relation, BaseRelationListener {
 			}
 		}
 		return true;
+	}
+
+	@Override
+	public Set<Entity> select() {
+		return Collections.<Entity>unmodifiableSet(getInfo().entities);
 	}
 }
