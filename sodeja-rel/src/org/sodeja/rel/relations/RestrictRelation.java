@@ -10,10 +10,10 @@ import org.sodeja.rel.Condition;
 import org.sodeja.rel.Entity;
 import org.sodeja.rel.Relation;
 
-public class RestrictRelation extends DerivedRelation {
+public class RestrictRelation extends UnaryRelation {
 	protected final Set<Condition> conditions;
 	
-	public RestrictRelation(String name, Relation relation, Condition condition) {
+	public RestrictRelation(String name, Relation relation, Condition... condition) {
 		this(name, relation, SetUtils.asSet(condition));
 	}
 	
@@ -24,7 +24,7 @@ public class RestrictRelation extends DerivedRelation {
 
 	@Override
 	public Set<Entity> select() {
-		Set<Entity> entities = relation.select();
+		Set<Entity> entities = right.select();
 		return (Set<Entity>) CollectionUtils.filter(entities, new HashSet<Entity>(), new Predicate1<Entity>() {
 			@Override
 			public Boolean execute(Entity p) {

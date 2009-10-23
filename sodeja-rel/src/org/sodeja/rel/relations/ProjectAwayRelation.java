@@ -9,17 +9,21 @@ import org.sodeja.rel.AttributeValue;
 import org.sodeja.rel.Entity;
 import org.sodeja.rel.Relation;
 
-public class ProjectAwayRelation extends DerivedRelation {
-	protected final String[] attributes;
-	
+public class ProjectAwayRelation extends UnaryRelation {
+	protected final Set<String> attributes;
+
 	public ProjectAwayRelation(String name, Relation relation, String... attributes) {
-		super(name, relation);
-		this.attributes = attributes;
+		this(name, relation, SetUtils.asSet(attributes));
 	}
 
+	public ProjectAwayRelation(String name, Relation relation, Set<String> attributes) {
+		super(name, relation);
+		this.attributes = new TreeSet<String>(attributes);
+	}
+	
 	@Override
 	public Set<Entity> select() {
-		Set<Entity> entities = relation.select();
+		Set<Entity> entities = right.select();
 		return SetUtils.map(entities, new Function1<Entity, Entity>() {
 			@Override
 			public Entity execute(Entity p) {
@@ -35,11 +39,6 @@ public class ProjectAwayRelation extends DerivedRelation {
 	}
 
 	protected boolean shouldRemove(AttributeValue val) {
-		for(String att : attributes) {
-			if(val.attribute.name.equals(att)) {
-				return true;
-			}
-		}
-		return false;
+		return attributes.contains(val.attribute.name);
 	}
 }

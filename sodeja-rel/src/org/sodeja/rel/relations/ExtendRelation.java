@@ -10,7 +10,7 @@ import org.sodeja.rel.CalculatedAttribute;
 import org.sodeja.rel.Entity;
 import org.sodeja.rel.Relation;
 
-public class ExtendRelation extends DerivedRelation {
+public class ExtendRelation extends UnaryRelation {
 	protected final CalculatedAttribute[] attributes;
 	
 	public ExtendRelation(String name, Relation relation, CalculatedAttribute... attributes) {
@@ -20,7 +20,7 @@ public class ExtendRelation extends DerivedRelation {
 
 	@Override
 	public Set<Entity> select() {
-		Set<Entity> entities = relation.select();
+		Set<Entity> entities = right.select();
 		return SetUtils.map(entities, new Function1<Entity, Entity>() {
 			@Override
 			public Entity execute(Entity p) {

@@ -11,20 +11,18 @@ import org.sodeja.rel.AttributeValue;
 import org.sodeja.rel.Entity;
 import org.sodeja.rel.Relation;
 
-public class SummarizeRelation extends DerivedRelation {
-	protected final Relation other;
+public class SummarizeRelation extends BinaryRelation {
 	protected final Aggregate aggregate;
 	
-	public SummarizeRelation(String name, Relation relation, Relation other, Aggregate aggregate) { // TODO maybe many ?
-		super(name, relation);
-		this.other = other;
+	public SummarizeRelation(String name, Relation left, Relation right, Aggregate aggregate) { // TODO maybe many ?
+		super(name, left, right);
 		this.aggregate = aggregate;
 	}
 
 	@Override
 	public Set<Entity> select() {
-		Set<Entity> all = relation.select();
-		Set<Entity> grouping = other.select();
+		Set<Entity> all = left.select();
+		Set<Entity> grouping = right.select();
 
 		Map<Entity, Set<Entity>> groups = new HashMap<Entity, Set<Entity>>();
 		for(Entity g : grouping) {
