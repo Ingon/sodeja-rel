@@ -64,11 +64,11 @@ public class Domain {
 		return (BaseRelation) rel;
 	}
 	
-	protected <T extends Relation> T remember(T relation) {
+	protected Relation remember(Relation relation) {
 		return remember(relation.getName(), relation);
 	}
 	
-	protected <T extends Relation> T remember(String name, T relation) {
+	protected Relation remember(String name, Relation relation) {
 		if(! StringUtils.isTrimmedEmpty(name)) {
 			relations.put(name, relation);
 			if(relation instanceof BaseRelation) {
@@ -82,10 +82,12 @@ public class Domain {
 		if(attributes.length % 2 != 0) {
 			throw new RuntimeException("Expected pairs into the array");
 		}
+		
 		Attribute[] atts = new Attribute[attributes.length / 2];
 		for(int i = 0; i < atts.length; i++) {
 			atts[i] = new Attribute((String) attributes[i * 2], (Type) attributes[i * 2 + 1]);
 		}
+		
 		return relation(name, atts);
 	}
 	
@@ -93,7 +95,8 @@ public class Domain {
 		if(StringUtils.isTrimmedEmpty(name)) {
 			throw new RuntimeException("Name is required for base relations");
 		}
-		return remember(name, new BaseRelation(this, name, attributes));
+
+		return (BaseRelation) remember(name, new BaseRelation(this, name, attributes));
 	}
 
 	public TransactionManager txm() {
