@@ -72,7 +72,7 @@ public class Domain {
 		return (BaseRelation) rel;
 	}
 	
-	private <T extends Relation> T remember(String name, T relation) {
+	protected <T extends Relation> T remember(String name, T relation) {
 		if(! StringUtils.isTrimmedEmpty(name)) {
 			relations.put(name, relation);
 			if(relation instanceof BaseRelation) {

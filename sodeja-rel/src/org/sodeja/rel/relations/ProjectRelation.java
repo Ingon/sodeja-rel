@@ -12,7 +12,7 @@ import org.sodeja.rel.Relation;
 public class ProjectRelation extends DerivedRelation {
 	protected final Set<String> attributes;
 	
-	public ProjectRelation(String name, Relation relation, String[] attributes) {
+	public ProjectRelation(String name, Relation relation, String... attributes) {
 		this(name, relation, SetUtils.asSet(attributes));
 	}
 
