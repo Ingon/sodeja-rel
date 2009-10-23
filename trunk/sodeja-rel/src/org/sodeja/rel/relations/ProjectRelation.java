@@ -9,7 +9,7 @@ import org.sodeja.rel.AttributeValue;
 import org.sodeja.rel.Entity;
 import org.sodeja.rel.Relation;
 
-public class ProjectRelation extends DerivedRelation {
+public class ProjectRelation extends UnaryRelation {
 	protected final Set<String> attributes;
 	
 	public ProjectRelation(String name, Relation relation, String... attributes) {
@@ -23,7 +23,7 @@ public class ProjectRelation extends DerivedRelation {
 	
 	@Override
 	public Set<Entity> select() {
-		Set<Entity> entities = relation.select();
+		Set<Entity> entities = right.select();
 		return SetUtils.map(entities, new Function1<Entity, Entity>() {
 			@Override
 			public Entity execute(Entity p) {

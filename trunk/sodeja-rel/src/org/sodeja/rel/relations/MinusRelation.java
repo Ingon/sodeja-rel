@@ -6,18 +6,15 @@ import java.util.Set;
 import org.sodeja.rel.Entity;
 import org.sodeja.rel.Relation;
 
-public class MinusRelation extends DerivedRelation {
-	protected final Relation other;
-
-	public MinusRelation(String name, Relation relation, Relation other) {
-		super(name, relation);
-		this.other = other;
+public class MinusRelation extends BinaryRelation {
+	public MinusRelation(String name, Relation left, Relation right) {
+		super(name, left, right);
 	}
 
 	@Override
 	public Set<Entity> select() {
-		Set<Entity> leftEntities = relation.select();
-		Set<Entity> rightEntities = other.select();
+		Set<Entity> leftEntities = left.select();
+		Set<Entity> rightEntities = right.select();
 		
 		Set<Entity> result = new HashSet<Entity>(leftEntities);
 		result.removeAll(rightEntities);

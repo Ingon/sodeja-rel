@@ -9,18 +9,15 @@ import org.sodeja.rel.AttributeValue;
 import org.sodeja.rel.Entity;
 import org.sodeja.rel.Relation;
 
-public class JoinRelation extends DerivedRelation {
-	protected final Relation other;
-	
-	public JoinRelation(String name, Relation relation, Relation other) {
-		super(name, relation);
-		this.other = other;
+public class JoinRelation extends BinaryRelation {
+	public JoinRelation(String name, Relation left, Relation right) {
+		super(name, left, right);
 	}
 
 	@Override
 	public Set<Entity> select() {
-		Set<Entity> leftResult = relation.select();
-		Set<Entity> rightResult = other.select();
+		Set<Entity> leftResult = left.select();
+		Set<Entity> rightResult = right.select();
 		
 		Set<Entity> result = new HashSet<Entity>();
 		for(Entity left : leftResult) {

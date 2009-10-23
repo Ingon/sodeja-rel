@@ -11,25 +11,22 @@ import org.sodeja.rel.BaseRelation;
 import org.sodeja.rel.Entity;
 import org.sodeja.rel.Relation;
 
-public class DetailMasterJoin extends DerivedRelation {
-	protected final Relation other;
+public class DetailMasterJoin extends BinaryRelation {
 	protected final Set<AttributeMapping> mappings;
 	
-	public DetailMasterJoin(String name, BaseRelation relation, BaseRelation other) {
-		this(name, relation, other, relation.getFkMapping(other));
+	public DetailMasterJoin(String name, BaseRelation left, BaseRelation right) {
+		this(name, left, right, left.getFkMapping(right));
 	}
 
-	public DetailMasterJoin(String name, Relation relation, Relation other, Set<AttributeMapping> mappings) {
-		super(name, relation);
-		
-		this.other = other;
+	public DetailMasterJoin(String name, Relation left, Relation right, Set<AttributeMapping> mappings) {
+		super(name, left, right);
 		this.mappings = mappings;
 	}
 
 	@Override
 	public Set<Entity> select() {
-		Set<Entity> leftResult = relation.select();
-		Set<Entity> rightResult = other.select();
+		Set<Entity> leftResult = left.select();
+		Set<Entity> rightResult = right.select();
 		
 		Set<Entity> result = new HashSet<Entity>();
 		for(Entity left : leftResult) {
