@@ -10,7 +10,7 @@ public class IntegrityTests {
 	}
 	
 	private static void pkCheck(Domain domain) {
-		TransactionManager tx = domain.getTransactionManager();
+		TransactionManager tx = domain.txm();
 		
 		tx.begin();
 		domain.insertPlain("Department", 
@@ -66,7 +66,7 @@ public class IntegrityTests {
 	}
 	
 	private static void fkCheck(Domain domain) {
-		TransactionManager tx = domain.getTransactionManager();
+		TransactionManager tx = domain.txm();
 		
 		tx.begin();
 		domain.insertPlain("Department", 
@@ -151,7 +151,7 @@ public class IntegrityTests {
 	
 	protected static Domain createDomain() {
 		Domain domain = new Domain();
-		domain.getTransactionManager().begin();
+		domain.txm().begin();
 		
 		BaseRelation dep = domain.relation("Department", 
 				new Attribute("id", Types.INT),
@@ -166,7 +166,7 @@ public class IntegrityTests {
 				primaryKey("id").
 				foreignKey(dep, "department_id", "id");
 		
-		domain.getTransactionManager().commit();
+		domain.txm().commit();
 		return domain;
 	}
 }

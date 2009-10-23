@@ -8,12 +8,15 @@ import java.util.TreeSet;
 
 import org.sodeja.collections.CollectionUtils;
 import org.sodeja.functional.Function1;
+import org.sodeja.rel.relations.ExtendRelation;
+import org.sodeja.rel.relations.ProjectAwayRelation;
+import org.sodeja.rel.relations.RestrictRelation;
 
 public class FRPPaperTest {
 	public static void main(String[] args) {
 		final Domain domain = setupDomain();
 		
-		domain.getTransactionManager().begin();
+		domain.txm().begin();
 		
 		Date offerDate = new Date();
 		domain.insertPlain("Property", 
@@ -123,7 +126,7 @@ public class FRPPaperTest {
 				"saleSpeed", SpeedBand.MEDIUM,
 				"commission", 3000.0);
 		
-		domain.getTransactionManager().commit();
+		domain.txm().commit();
 		
 		System.out.println("Property: " + domain.select("Property"));
 		System.out.println("Offer: " + domain.select("Offer"));
@@ -148,7 +151,7 @@ public class FRPPaperTest {
 		System.out.println("PropertyForWebSite: " + domain.select("PropertyForWebSite"));
 		System.out.println("CommissionDue: " + domain.select("CommissionDue"));
 		
-		domain.getTransactionManager().begin();
+		domain.txm().begin();
 		domain.insertPlain("Property", 
 				"address", "Sofia, ML1",
 				"price", 90000.0,
@@ -156,7 +159,7 @@ public class FRPPaperTest {
 				"agent", "agent1",
 				"dateRegistered", offerDate);
 		try {
-			domain.getTransactionManager().commit();
+			domain.txm().commit();
 		} catch(ConstraintViolationException exc) {
 			System.out.println("Rolledback");
 		}
@@ -168,7 +171,7 @@ public class FRPPaperTest {
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
-				domain.getTransactionManager().begin();
+				domain.txm().begin();
 				try {
 					Thread.sleep(1000);
 				} catch (InterruptedException e) {
@@ -183,7 +186,7 @@ public class FRPPaperTest {
 //						);
 				domain.deletePlain("Room", "roomName", "Supp");
 				try {
-					domain.getTransactionManager().commit();
+					domain.txm().commit();
 					System.out.println("TH1 succ");
 				} catch(RollbackException exc) {
 					System.out.println("Not Properly rolledback");
@@ -195,7 +198,7 @@ public class FRPPaperTest {
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
-				domain.getTransactionManager().begin();
+				domain.txm().begin();
 //				domain.insertPlain("Room", 
 //						"address", "Sofia, OK",
 //						"roomName", "Third",
@@ -205,7 +208,7 @@ public class FRPPaperTest {
 //						);
 				domain.deletePlain("Room", "roomName", "Supp");
 				try {
-					domain.getTransactionManager().commit();
+					domain.txm().commit();
 				} catch(RollbackException exc) {
 					System.out.println("Properly rolledback");
 				}
@@ -216,7 +219,7 @@ public class FRPPaperTest {
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
-				domain.getTransactionManager().begin();
+				domain.txm().begin();
 //				domain.insertPlain("Room", 
 //						"address", "Sofia, OK",
 //						"roomName", "Third",
@@ -226,7 +229,7 @@ public class FRPPaperTest {
 //						);
 				domain.deletePlain("Room", "roomName", "Supp1");
 				try {
-					domain.getTransactionManager().commit();
+					domain.txm().commit();
 					System.out.println("TH3 succ");
 				} catch(RollbackException exc) {
 					System.out.println("Not Properly rolledback");
@@ -257,7 +260,7 @@ public class FRPPaperTest {
 		
 		// Base
 		
-		dom.getTransactionManager().begin();
+		dom.txm().begin();
 		dom.relation("Property",
 				new Attribute("address", address),
 				new Attribute("price", price),
@@ -308,7 +311,7 @@ public class FRPPaperTest {
 				new Attribute("saleSpeed", speedBand),
 				new Attribute("commission", Types.DOUBLE))
 				.primaryKey("priceBand", "areaCode", "saleSpeed");
-		dom.getTransactionManager().commit();
+		dom.txm().commit();
 		
 		// Internal
 		
@@ -361,7 +364,7 @@ public class FRPPaperTest {
 			@Override
 			public Object calculate(Entity entity) {
 				final String address = (String) entity.getValue("address");
-				return dom.restrict("RoomInfo", new Condition() {
+				return new RestrictRelation(null, dom.resolve("RoomInfo"), new Condition() {
 					@Override
 					public boolean satisfied(Entity e) {
 						String iaddress = (String) e.getValue("address");
@@ -372,7 +375,7 @@ public class FRPPaperTest {
 			@Override
 			public Object calculate(Entity entity) {
 				final String address = (String) entity.getValue("address");
-				Set<Entity> result = dom.restrict("RoomInfo", new Condition() {
+				Set<Entity> result = new RestrictRelation(null, dom.resolve("RoomInfo"), new Condition() {
 					@Override
 					public boolean satisfied(Entity e) {
 						String iaddress = (String) e.getValue("address");
@@ -390,83 +393,83 @@ public class FRPPaperTest {
 				return SpeedBand.MEDIUM; // TODO impl sometime
 			}};
 		
-		dom.extend("RoomInfo", "Room", roomSizeAtt);
+		dom.remember(new ExtendRelation("RoomInfo", dom.resolve("Room"), roomSizeAtt));
 		
-		dom.project_away("Acceptance", dom.restrict("Decision", new Condition() {
+		dom.remember(new ProjectAwayRelation("Acceptance", new RestrictRelation(null, dom.resolve("Decision"), new Condition() {
 			@Override
 			public boolean satisfied(Entity e) {
 				return (Boolean) e.getValue("accepted");
-			}}), "accepted");
+			}}), "accepted"));
 		
-		dom.project_away("Rejection", dom.restrict("Decision", new Condition() {
+		dom.remember(new ProjectAwayRelation("Rejection", new RestrictRelation(null, dom.resolve("Decision"), new Condition() {
 			@Override
 			public boolean satisfied(Entity e) {
 				return ! (Boolean) e.getValue("accepted");
-			}}), "accepted");
+			}}), "accepted"));
 		
-		dom.extend("PropertyInfo", "Property", priceBandPriceAtt, areaCodeAtt, numberOfRoomsAtt, squareFeetAtt);
-		
-		dom.summarize("CurrentOffer", "Offer", dom.project("Offer", "address", "bidderName", "bidderAddress"), new Aggregate() {
-			@Override
-			public Entity aggregate(Entity base, Set<Entity> entities) {
-				return Collections.max(entities, new Comparator<Entity>() {
-					@Override
-					public int compare(Entity o1, Entity o2) {
-						Date d1 = (Date) o1.getValue("offerDate");
-						Date d2 = (Date) o2.getValue("offerDate");
-						return d1.compareTo(d2);
-					}});
-			}});
-		
-		dom.project_away("RawSales", dom.join("Acceptance", 
-				dom.join("CurrentOffer", dom.project("Property", "address", "agent", "dateRegistered"))),
-			"offerDate", "bidderName", "bidderAddress");
-		
-		dom.project("SoldProperty", dom.resolve("RawSales"), "address");
-		
-		dom.minus("UnsoldProperty", dom.project("Property", "address"), "SoldProperty");
-		
-		dom.project("SalesInfo", dom.extend("RawSales", areaCodeAtt, saleSpeedAtt, priceBandOfferAtt),
-			"address", "agent", "areaCode", "saleSpeed", "priceBand");
-		
-		dom.project("SalesCommissions", dom.join("SalesInfo", "Commission"), "address", "agent", "commission");
-		
-		// External
-		
-		dom.join("OpenOffers", "CurrentOffer", dom.minus(
-				dom.project_away(dom.resolve("CurrentOffer"), "offerPrice"),
-				dom.project_away(dom.resolve("Decision"), "accepted", "decisionDate")));
-		
-		dom.project("PropertyForWebSite", dom.join("UnsoldProperty", "PropertyInfo"), "address", "price", "photo", "numberOfRooms", "squareFeet");
-		
-		dom.project("CommissionDue", dom.summarize("SalesCommissions", dom.project("SalesCommissions", "agent"), new Aggregate() {
-			@Override
-			public Entity aggregate(Entity base, Set<Entity> entities) {
-				Double total = CollectionUtils.sumDouble(entities, new Function1<Double, Entity>() {
-					@Override
-					public Double execute(Entity p) {
-						return (Double) p.getValue("commission");
-					}});
-				
-				TreeSet<AttributeValue> values = new TreeSet<AttributeValue>(base.getValues());
-				values.add(new AttributeValue(new Attribute("totalCommission", Types.DOUBLE), total));
-				return new Entity(values);
-			}}), "agent", "totalCommission");
-		
-		// Integrity
-		dom.addCheck("All properties at least one room", new IntegrityCheck() {
-			Relation intRelation = dom.restrict("PropertyInfo", new Condition() {
-				@Override
-				public boolean satisfied(Entity e) {
-					int rooms = (Integer) e.getValue("numberOfRooms");
-					return rooms < 1;
-				}});
-			
-			@Override
-			public boolean perform() {
-				return intRelation.select().size() == 0;
-			}
-		});
+//		dom.extend("PropertyInfo", "Property", priceBandPriceAtt, areaCodeAtt, numberOfRoomsAtt, squareFeetAtt);
+//		
+//		dom.summarize("CurrentOffer", "Offer", dom.project("Offer", "address", "bidderName", "bidderAddress"), new Aggregate() {
+//			@Override
+//			public Entity aggregate(Entity base, Set<Entity> entities) {
+//				return Collections.max(entities, new Comparator<Entity>() {
+//					@Override
+//					public int compare(Entity o1, Entity o2) {
+//						Date d1 = (Date) o1.getValue("offerDate");
+//						Date d2 = (Date) o2.getValue("offerDate");
+//						return d1.compareTo(d2);
+//					}});
+//			}});
+//		
+//		dom.project_away("RawSales", dom.join("Acceptance", 
+//				dom.join("CurrentOffer", dom.project("Property", "address", "agent", "dateRegistered"))),
+//			"offerDate", "bidderName", "bidderAddress");
+//		
+//		dom.project("SoldProperty", dom.resolve("RawSales"), "address");
+//		
+//		dom.minus("UnsoldProperty", dom.project("Property", "address"), "SoldProperty");
+//		
+//		dom.project("SalesInfo", dom.extend("RawSales", areaCodeAtt, saleSpeedAtt, priceBandOfferAtt),
+//			"address", "agent", "areaCode", "saleSpeed", "priceBand");
+//		
+//		dom.project("SalesCommissions", dom.join("SalesInfo", "Commission"), "address", "agent", "commission");
+//		
+//		// External
+//		
+//		dom.join("OpenOffers", "CurrentOffer", dom.minus(
+//				dom.project_away(dom.resolve("CurrentOffer"), "offerPrice"),
+//				dom.project_away(dom.resolve("Decision"), "accepted", "decisionDate")));
+//		
+//		dom.project("PropertyForWebSite", dom.join("UnsoldProperty", "PropertyInfo"), "address", "price", "photo", "numberOfRooms", "squareFeet");
+//		
+//		dom.project("CommissionDue", dom.summarize("SalesCommissions", dom.project("SalesCommissions", "agent"), new Aggregate() {
+//			@Override
+//			public Entity aggregate(Entity base, Set<Entity> entities) {
+//				Double total = CollectionUtils.sumDouble(entities, new Function1<Double, Entity>() {
+//					@Override
+//					public Double execute(Entity p) {
+//						return (Double) p.getValue("commission");
+//					}});
+//				
+//				TreeSet<AttributeValue> values = new TreeSet<AttributeValue>(base.getValues());
+//				values.add(new AttributeValue(new Attribute("totalCommission", Types.DOUBLE), total));
+//				return new Entity(values);
+//			}}), "agent", "totalCommission");
+//		
+//		// Integrity
+//		dom.addCheck("All properties at least one room", new IntegrityCheck() {
+//			Relation intRelation = dom.restrict("PropertyInfo", new Condition() {
+//				@Override
+//				public boolean satisfied(Entity e) {
+//					int rooms = (Integer) e.getValue("numberOfRooms");
+//					return rooms < 1;
+//				}});
+//			
+//			@Override
+//			public boolean perform() {
+//				return intRelation.select().size() == 0;
+//			}
+//		});
 		
 		return dom;
 	}

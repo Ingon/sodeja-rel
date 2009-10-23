@@ -13,7 +13,7 @@ import org.sodeja.rel.Relation;
 public class ExtendRelation extends DerivedRelation {
 	protected final CalculatedAttribute[] attributes;
 	
-	public ExtendRelation(String name, Relation relation, CalculatedAttribute[] attributes) {
+	public ExtendRelation(String name, Relation relation, CalculatedAttribute... attributes) {
 		super(name, relation);
 		this.attributes = attributes;
 	}
