@@ -9,12 +9,12 @@ public class PerformanceTest {
 		long totalStart = System.currentTimeMillis();
 		while(dep.select().size() <= 10000) {
 			long start = System.currentTimeMillis();
-			domain.getTransactionManager().begin();
+			domain.txm().begin();
 			int idStart = depId;
 			int idEnd = insert(domain, depId, 16);
 			depId = idEnd;
 			
-			domain.getTransactionManager().commit();
+			domain.txm().commit();
 			long end = System.currentTimeMillis();
 			long time = end - start;
 			System.out.println("Insert Time: " + time);
@@ -22,11 +22,11 @@ public class PerformanceTest {
 			
 			
 			start = System.currentTimeMillis();
-			domain.getTransactionManager().begin();
+			domain.txm().begin();
 			
 			update(domain, idStart, 8);
 			
-			domain.getTransactionManager().commit();
+			domain.txm().commit();
 			end = System.currentTimeMillis();
 			time = end - start;
 			System.out.println("Update Time: " + time);
@@ -34,11 +34,11 @@ public class PerformanceTest {
 			
 			
 			start = System.currentTimeMillis();
-			domain.getTransactionManager().begin();
+			domain.txm().begin();
 			
 			delete(domain, idStart + 8, 8);
 			
-			domain.getTransactionManager().commit();
+			domain.txm().commit();
 			end = System.currentTimeMillis();
 			time = end - start;
 			System.out.println("Delete Time: " + time);

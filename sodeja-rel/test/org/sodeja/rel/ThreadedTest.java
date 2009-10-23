@@ -31,42 +31,42 @@ public class ThreadedTest {
 			}
 			
 			for(Integer i : insertRange) {
-				domain.getTransactionManager().begin();
+				domain.txm().begin();
 				
 				domain.insertPlain("Department", 
 						"id", i, 
 						"name", "fairlyLongName", 
 						"manager", "fairlyLongManagerName");
 				
-				domain.getTransactionManager().commit();
+				domain.txm().commit();
 			}
 
 			for(Integer i : insertAnDeleteRange) {
-				domain.getTransactionManager().begin();
+				domain.txm().begin();
 
 				domain.insertPlain("Department", 
 						"id", i, 
 						"name", "fairlyLongName", 
 						"manager", "fairlyLongManagerName");
 				
-				domain.getTransactionManager().commit();
+				domain.txm().commit();
 
-				domain.getTransactionManager().begin();
+				domain.txm().begin();
 
 				domain.deletePlain("Department", "id", i); 
 
-				domain.getTransactionManager().commit();
+				domain.txm().commit();
 			}
 			
 			for(Integer i : insertRange) {
-				domain.getTransactionManager().begin();
+				domain.txm().begin();
 				
 				domain.insertPlain("Employee", 
 						"id", i, 
 						"name", "fairlyLongName", 
 						"department_id", i);
 				
-				domain.getTransactionManager().commit();
+				domain.txm().commit();
 			}
 			
 			System.out.println("Finished");

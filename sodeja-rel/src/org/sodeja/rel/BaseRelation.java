@@ -558,6 +558,11 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	}
 
 	@Override
+	public String getName() {
+		return name;
+	}
+
+	@Override
 	public Set<Entity> select() {
 		return Collections.<Entity>unmodifiableSet(getInfo().entities);
 	}
