@@ -561,4 +561,8 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	public Set<Entity> select() {
 		return Collections.<Entity>unmodifiableSet(getInfo().entities);
 	}
+
+	public Set<AttributeMapping> getFkMapping(BaseRelation other) {
+		return fks.get(other);
+	}
 }
