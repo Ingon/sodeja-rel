@@ -1,6 +1,7 @@
 package org.sodeja.rel.relations;
 
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.TreeSet;
 
 import org.sodeja.collections.SetUtils;
@@ -24,7 +25,7 @@ public class ExtendRelation extends UnaryRelation {
 		return SetUtils.map(entities, new Function1<Entity, Entity>() {
 			@Override
 			public Entity execute(Entity p) {
-				Set<AttributeValue> nvalues = new TreeSet<AttributeValue>(p.getValues());
+				SortedSet<AttributeValue> nvalues = new TreeSet<AttributeValue>(p.getValues());
 				for(CalculatedAttribute att : attributes) {
 					Object o = att.calculate(p);
 					if(! att.type.accepts(o)) {

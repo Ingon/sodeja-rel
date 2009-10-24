@@ -1,6 +1,7 @@
 package org.sodeja.rel;
 
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.TreeSet;
 
 import org.sodeja.collections.PersistentMap;
@@ -65,7 +66,7 @@ class BaseRelationIndex {
 	}
 	
 	private Entity extract(Entity e) {
-		Set<AttributeValue> pkValues = new TreeSet<AttributeValue>();
+		SortedSet<AttributeValue> pkValues = new TreeSet<AttributeValue>();
 		for(Attribute att : attributes) {
 			pkValues.add(e.getAttributeValue(att.name));
 		}

@@ -2,6 +2,7 @@ package org.sodeja.rel.relations;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.TreeSet;
 
 import org.sodeja.lang.ObjectUtils;
@@ -42,7 +43,7 @@ public class JoinRelation extends BinaryRelation {
 	}
 
 	private Entity combine(Entity left, Entity right) {
-		Set<AttributeValue> resultSet = new TreeSet<AttributeValue>(left.getValues());
+		SortedSet<AttributeValue> resultSet = new TreeSet<AttributeValue>(left.getValues());
 		for(AttributeValue rval : right.getValues()) {
 			if(left.getAttributeValue(rval.attribute.name) == null) {
 				resultSet.add(rval);

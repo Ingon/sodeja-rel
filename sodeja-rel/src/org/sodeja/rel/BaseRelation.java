@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.TreeSet;
 
 import org.sodeja.collections.ArrayUtils;
@@ -28,7 +29,7 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	protected final IDGenerator idGen = new IDGenerator();
 	
 	protected Set<Attribute> pk;
-	protected Set<ForeignKey> fks = new HashSet<ForeignKey>();
+	protected final Set<ForeignKey> fks = new HashSet<ForeignKey>();
 	
 	protected final Set<BaseRelationListener> listeners = new HashSet<BaseRelationListener>();
 
@@ -100,19 +101,23 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	}
 
 	private Set<Attribute> resolveAttributes(String... attributeNames) {
+		return resolveAttributes(SetUtils.asSet(attributeNames));
+	}
+
+	protected Set<Attribute> resolveAttributes(Set<String> attributeNames) {
 		Set<Attribute> atts = new TreeSet<Attribute>();
 		for(String name : attributeNames) {
 			Attribute att = attributeFinder.execute(name);
 			if(att == null) {
-				throw new RuntimeException("Unknown attribute name");
+				throw new RuntimeException("Unknown attribute name: " + name);
 			}
 			atts.add(att);
 		}
 		return atts;
 	}
-
+	
 	public void insert(Set<Pair<String, Object>> attributeValues) {
-		BaseEntity e = new BaseEntity(idGen.next(), extractValues(attributeValues));
+		BaseEntity e = new BaseEntity(idGen.next(), extractValues(attributeValues, true));
 		
 		BaseRelationInfo currentInfo = getInfo();
 		
@@ -149,7 +154,7 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	private void checkForeignKeys(BaseRelationInfo currentInfo, BaseEntity e) {
 		for(ForeignKey fk : fks) {
 			Set<Entity> pkIndex = fk.foreignRelation.getPkIndex().index();
-			Entity pk = makeReferenceEntity(e, fk.mappings);
+			Entity pk = fk.toTargetPk(e);
 			if (! pkIndex.contains(pk)) {
 				Set<Long> starvingIds = currentInfo.starvingEntities.get(fk);
 				if(starvingIds == null) {
@@ -162,8 +167,8 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	}
 
 	public void update(Set<Pair<String, Object>> attributeValues, Set<Pair<String, Object>> newAttributeValues) {
-		final Set<AttributeValue> values = extractValues(attributeValues);
-		Set<AttributeValue> pkValues = (Set<AttributeValue>) CollectionUtils.filter(values, new TreeSet<AttributeValue>(), new Predicate1<AttributeValue>() {
+		final Set<AttributeValue> values = extractValues(attributeValues, false);
+		SortedSet<AttributeValue> pkValues = CollectionUtils.filter(values, new TreeSet<AttributeValue>(), new Predicate1<AttributeValue>() {
 			@Override
 			public Boolean execute(AttributeValue p) {
 				return pk.contains(p.attribute);
@@ -277,8 +282,8 @@ public class BaseRelation implements Relation, BaseRelationListener {
 		setInfo(currentInfo.copyDelta(entities, entityMap, newPkIndex, newFkIndexes));
 	}
 
-	private Set<AttributeValue> merge(BaseEntity e, Set<Pair<String, Object>> attributeValues) {
-		Set<AttributeValue> newValues = new TreeSet<AttributeValue>();
+	private SortedSet<AttributeValue> merge(BaseEntity e, Set<Pair<String, Object>> attributeValues) {
+		SortedSet<AttributeValue> newValues = new TreeSet<AttributeValue>();
 		newValues.addAll(e.getValues());
 		
 		for(Pair<String, Object> value : attributeValues) {
@@ -299,8 +304,8 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	}
 
 	public void delete(Set<Pair<String, Object>> attributeValues) {
-		final Set<AttributeValue> values = extractValues(attributeValues);
-		Set<AttributeValue> pkValues = (Set<AttributeValue>) CollectionUtils.filter(values, new TreeSet<AttributeValue>(), new Predicate1<AttributeValue>() {
+		final Set<AttributeValue> values = extractValues(attributeValues, false);
+		SortedSet<AttributeValue> pkValues = CollectionUtils.filter(values, new TreeSet<AttributeValue>(), new Predicate1<AttributeValue>() {
 			@Override
 			public Boolean execute(AttributeValue p) {
 				return pk.contains(p.attribute);
@@ -396,20 +401,22 @@ public class BaseRelation implements Relation, BaseRelationListener {
 		setInfo(currentInfo.copyDelta(entities, entityMap, newPkIndex, newFkIndexes));
 	}
 	
-	private Set<AttributeValue> extractValues(Set<Pair<String, Object>> attributeValues) {
-		return (Set<AttributeValue>) CollectionUtils.map(attributeValues, new TreeSet<AttributeValue>(), 
-				new Function1<AttributeValue, Pair<String, Object>>() {
-					@Override
-					public AttributeValue execute(Pair<String, Object> p) {
-						Attribute att = attributeFinder.execute(p.first);
-						if(att == null) {
-							throw new RuntimeException("Unknown attribute name: " + p.first);
-						}
-						if(! att.type.accepts(p.second)) {
-							throw new ConstraintViolationException("Wrong type for " + p.first);
-						}
-						return new AttributeValue(att, att.type.canonize(p.second));
-					}});
+	private SortedSet<AttributeValue> extractValues(Set<Pair<String, Object>> attributeValues, boolean strict) {
+		if(strict && (attributeValues.size() != attributes.size())) {
+			throw new RuntimeException("Expected values for all relation attributes");
+		}
+		return SetUtils.maps(attributeValues, new Function1<AttributeValue, Pair<String, Object>>() {
+				@Override
+				public AttributeValue execute(Pair<String, Object> p) {
+					Attribute att = attributeFinder.execute(p.first);
+					if(att == null) {
+						throw new RuntimeException("Unknown attribute name: " + p.first);
+					}
+					if(! att.type.accepts(p.second)) {
+						throw new ConstraintViolationException("Wrong type for " + p.first);
+					}
+					return new AttributeValue(att, att.type.canonize(p.second));
+				}});
 	}
 
 	protected Entity selectByKey(Entity ent) {
@@ -426,17 +433,17 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	}
 
 	protected Entity selectByPk(Entity pk) {
-		BaseRelationIndex pkIndex = getInfo().pkIndex;
-		PersistentSet<BaseEntity> e = pkIndex.find(pk);
+		PersistentSet<BaseEntity> e = getInfo().pkIndex.find(pk);
 		if(e == null || e.isEmpty()) {
 			return null;
-		} else {
-			Iterator<BaseEntity> ite = e.iterator();
-			if(! ite.hasNext()) {
-				throw new RuntimeException("Set is not empty but the iterator does not return elemens ?");
-			}
-			return ite.next();
 		}
+		
+		Iterator<BaseEntity> ite = e.iterator();
+		if(! ite.hasNext()) {
+			throw new RuntimeException("Set is not empty but the iterator does not return elemens ?");
+		}
+		
+		return ite.next();
 	}
 	
 	private BaseRelationInfo getInfo() {
@@ -479,16 +486,6 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	private BaseRelationIndex getPkIndex() {
 		return getInfo().pkIndex;
 	}
-	
-	private Entity makeReferenceEntity(final Entity thisEntity, Set<AttributeMapping> mappings) {
-		Set<AttributeValue> values = SetUtils.map(mappings, new Function1<AttributeValue, AttributeMapping>() {
-			@Override
-			public AttributeValue execute(AttributeMapping p) {
-				AttributeValue val = thisEntity.getAttributeValue(p.source);
-				return new AttributeValue(p.target, val.value);
-			}});
-		return new Entity(values);
-	}
 
 	protected BaseRelationInfo copyInfo(BaseRelationInfo value) {
 		return value.clearCopy();
@@ -508,7 +505,7 @@ public class BaseRelation implements Relation, BaseRelationListener {
 				return;
 			}
 			
-			Entity fkEntity = makeFkEntity(fk, entity);
+			Entity fkEntity = fk.toSourceFk(entity);
 			for(Iterator<Long> ite = starvingIds.iterator(); ite.hasNext(); ) {
 				Long l = ite.next();
 				if(subsetOf(info.entityMap.get(l), fkEntity)) {
@@ -538,7 +535,7 @@ public class BaseRelation implements Relation, BaseRelationListener {
 			
 			Set<Long> starvingIds = info.starvingEntities.get(fk);
 			BaseRelationIndex index = info.fkIndexes.indexFor(fk.getSourceAttributes());
-			Entity fkOldEntity = makeFkEntity(fk, entity);
+			Entity fkOldEntity = fk.toSourceFk(entity);
 			Set<BaseEntity> oldEntities = index.find(fkOldEntity);
 			if(oldEntities != null) {
 				if(starvingIds == null) {
@@ -553,14 +550,6 @@ public class BaseRelation implements Relation, BaseRelationListener {
 		}
 	}
 
-	private Entity makeFkEntity(ForeignKey fk, BaseEntity entity) {
-		Set<AttributeValue> values = new TreeSet<AttributeValue>();
-		for(AttributeMapping m : fk.mappings) {
-			values.add(new AttributeValue(m.source, entity.getAttributeValue(m.target).value));
-		}
-		return new Entity(values);
-	}
-	
 	private boolean subsetOf(BaseEntity baseEntity, Entity fkEntity) {
 		for(AttributeValue fv : fkEntity.values) {
 			AttributeValue v = baseEntity.getAttributeValue(fv.attribute);
@@ -581,26 +570,47 @@ public class BaseRelation implements Relation, BaseRelationListener {
 		return Collections.<Entity>unmodifiableSet(getInfo().entities);
 	}
 
-	public Set<AttributeMapping> getFkMapping(BaseRelation relation) {
-		Set<AttributeMapping> result = null;
+	public Entity selectByPk(Set<Pair<String, Object>> pk) {
+		Entity pke = new Entity(extractValues(pk, false));
+		return selectByPk(pke);
+	}
+	
+	public ForeignKey getFk(BaseRelation relation) {
+		ForeignKey result = null;
 		for(ForeignKey fk : fks) {
 			if(fk.foreignRelation.equals(relation)) {
 				if(result != null) {
-					throw new RuntimeException("Ambiguous foreign key mapping for " + relation.getName());
+					throw new RuntimeException("Ambiguous foreign key for " + relation.getName());
 				}
-				result = fk.mappings;
+				result = fk;
 			}
 		}
 		return result;
 	}
 	
-	public Set<AttributeMapping> getFkMapping(BaseRelation relation, String... attributeStrs) {
+	public ForeignKey getFk(BaseRelation relation, String... attributeStrs) {
 		Set<Attribute> attributes = resolveAttributes(attributeStrs);
 		for(ForeignKey fk : fks) {
 			if(fk.foreignRelation.equals(relation) && fk.getSourceAttributes().equals(attributes)) {
-				return fk.mappings;
+				return fk;
 			}
 		}
 		return null;
+	}
+	
+	public Set<AttributeMapping> getFkMapping(BaseRelation relation) {
+		ForeignKey fk = getFk(relation);
+		if(fk == null) {
+			return null;
+		}
+		return fk.mappings;
+	}
+	
+	public Set<AttributeMapping> getFkMapping(BaseRelation relation, String... attributeStrs) {
+		ForeignKey fk = getFk(relation, attributeStrs);
+		if(fk == null) {
+			return null;
+		}
+		return fk.mappings;
 	}
 }

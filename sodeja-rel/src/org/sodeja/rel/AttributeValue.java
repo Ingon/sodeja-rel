@@ -42,4 +42,8 @@ public class AttributeValue implements Comparable<AttributeValue> {
 	public String toString() {
 		return attribute + "::" + value;
 	}
+
+	public AttributeValue rename(String newName) {
+		return new AttributeValue(attribute.rename(newName), value);
+	}
 }
