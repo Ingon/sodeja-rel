@@ -115,7 +115,7 @@ public class ThreadedTest {
 			Entity e = it.next();
 			Attribute idatt = e.getAttributeValue("id").attribute;
 			for(Integer i : new Range(0, threads.length * sz)) {
-				if(rel.selectByKey(new Entity(SetUtils.asSet(new AttributeValue(idatt, i)))) == null) {
+				if(rel.selectByKey(new Entity(SetUtils.asSets(new AttributeValue(idatt, i)))) == null) {
 					System.out.println("Missing: " + i);
 				}
 			}

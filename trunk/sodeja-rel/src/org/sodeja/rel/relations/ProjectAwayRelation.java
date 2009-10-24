@@ -1,6 +1,7 @@
 package org.sodeja.rel.relations;
 
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.TreeSet;
 
 import org.sodeja.collections.SetUtils;
@@ -28,7 +29,7 @@ public class ProjectAwayRelation extends UnaryRelation {
 			@Override
 			public Entity execute(Entity p) {
 				Set<AttributeValue> vals = p.getValues();
-				Set<AttributeValue> filtered = new TreeSet<AttributeValue>();
+				SortedSet<AttributeValue> filtered = new TreeSet<AttributeValue>();
 				for(AttributeValue val : vals) {
 					if(! shouldRemove(val)) {
 						filtered.add(val);

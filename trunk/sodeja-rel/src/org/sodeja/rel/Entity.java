@@ -2,12 +2,13 @@ package org.sodeja.rel;
 
 import java.util.Collections;
 import java.util.Set;
+import java.util.SortedSet;
 
 public class Entity {
-	protected final Set<AttributeValue> values;
+	protected final SortedSet<AttributeValue> values;
 
-	public Entity(Set<AttributeValue> values) {
-		this.values = Collections.unmodifiableSet(values);
+	public Entity(SortedSet<AttributeValue> values) {
+		this.values = Collections.unmodifiableSortedSet(values);
 	}
 
 	public Object getValue(String attribute) {
