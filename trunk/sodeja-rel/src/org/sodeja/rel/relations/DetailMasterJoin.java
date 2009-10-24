@@ -15,7 +15,16 @@ public class DetailMasterJoin extends BinaryRelation {
 	protected final Set<AttributeMapping> mappings;
 	
 	public DetailMasterJoin(String name, BaseRelation left, BaseRelation right) {
-		this(name, left, right, left.getFkMapping(right));
+		super(name, left, right);
+		this.mappings = left.getFkMapping(right);
+	}
+	
+	public DetailMasterJoin(String name, BaseRelation left, BaseRelation right, String... attributes) {
+		super(name, left, right);
+		this.mappings = left.getFkMapping(right, attributes);
+		if(this.mappings == null) {
+			throw new RuntimeException("Foreign key to " + right.getName() + " on these attributes not found");
+		}
 	}
 
 	public DetailMasterJoin(String name, Relation left, Relation right, Set<AttributeMapping> mappings) {

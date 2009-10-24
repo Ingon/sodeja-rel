@@ -5,7 +5,15 @@ import java.util.Date;
 public enum Types implements Type {
 	STRING(String.class),
 	INT(int.class, Integer.class),
-	LONG(int.class, Integer.class, long.class, Long.class),
+	LONG(int.class, Integer.class, long.class, Long.class) {
+		@Override
+		public Object canonize(Object o) {
+			if(o instanceof Integer) {
+				return ((Integer) o).longValue();
+			}
+			return super.canonize(o);
+		}
+	},
 	DOUBLE(double.class, Double.class),
 	DATE(Date.class), 
 	BOOL(boolean.class, Boolean.class);
@@ -28,5 +36,10 @@ public enum Types implements Type {
 			}
 		}
 		return false;
+	}
+
+	@Override
+	public Object canonize(Object o) {
+		return o;
 	}
 }
