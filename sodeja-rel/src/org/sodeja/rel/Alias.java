@@ -11,4 +11,9 @@ class Alias implements Type {
 	public boolean accepts(Object o) {
 		return delegate.accepts(o);
 	}
+
+	@Override
+	public Object canonize(Object o) {
+		return delegate.canonize(o);
+	}
 }

@@ -26,7 +26,11 @@ public class ExtendRelation extends UnaryRelation {
 			public Entity execute(Entity p) {
 				Set<AttributeValue> nvalues = new TreeSet<AttributeValue>(p.getValues());
 				for(CalculatedAttribute att : attributes) {
-					nvalues.add(new AttributeValue(att, att.calculate(p)));
+					Object o = att.calculate(p);
+					if(! att.type.accepts(o)) {
+						throw new RuntimeException("Result from calculation is not accepted by the type of the attribute - " + att.name);
+					}
+					nvalues.add(new AttributeValue(att, att.type.canonize(o)));
 				}
 				return new Entity(nvalues);
 			}});

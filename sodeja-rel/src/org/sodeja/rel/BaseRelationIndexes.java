@@ -5,18 +5,18 @@ import java.util.Set;
 import org.sodeja.collections.PersistentSet;
 
 public class BaseRelationIndexes {
-	public final PersistentSet<BaseRelationIndex> fkIndexes;
+	public final PersistentSet<BaseRelationIndex> indexes;
 
 	protected BaseRelationIndexes() {
-		this.fkIndexes = new PersistentSet<BaseRelationIndex>();
+		this.indexes = new PersistentSet<BaseRelationIndex>();
 	}
 	
 	private BaseRelationIndexes(PersistentSet<BaseRelationIndex> fkIndexes) {
-		this.fkIndexes = fkIndexes;
+		this.indexes = fkIndexes;
 	}
 
 	public BaseRelationIndexes insert(BaseEntity val) {
-		PersistentSet<BaseRelationIndex> newFkIndexes = fkIndexes;
+		PersistentSet<BaseRelationIndex> newFkIndexes = indexes;
 		for(BaseRelationIndex index : newFkIndexes) {
 			newFkIndexes = newFkIndexes.addValue(index.insert(val));
 		}
@@ -24,26 +24,26 @@ public class BaseRelationIndexes {
 	}
 
 	public BaseRelationIndexes delete(BaseEntity val) {
-		PersistentSet<BaseRelationIndex> newFkIndexes = fkIndexes;
+		PersistentSet<BaseRelationIndex> newFkIndexes = indexes;
 		for(BaseRelationIndex index : newFkIndexes) {
 			newFkIndexes = newFkIndexes.addValue(index.delete(val));
 		}
 		return new BaseRelationIndexes(newFkIndexes);
 	}
 	
-	public BaseRelationIndexes addIndex(BaseRelationIndex fkIndex) {
-		if(fkIndexes.contains(fkIndex)) {
+	public BaseRelationIndexes addIndex(BaseRelationIndex index) {
+		if(indexes.contains(index)) {
 			return this;
 		}
-		return new BaseRelationIndexes(fkIndexes.addValue(fkIndex));
+		return new BaseRelationIndexes(indexes.addValue(index));
 	}
 
-	public BaseRelationIndexes removeIndex(BaseRelationIndex fkIndex) {
-		return new BaseRelationIndexes(fkIndexes.removeValue(fkIndex));
+	public BaseRelationIndexes removeIndex(BaseRelationIndex index) {
+		return new BaseRelationIndexes(indexes.removeValue(index));
 	}
 	
 	public BaseRelationIndex indexFor(Set<Attribute> attributes) { // TODO could be cached with PersistentMap
-		for(BaseRelationIndex index : fkIndexes) {
+		for(BaseRelationIndex index : indexes) {
 			if(index.attributes.equals(attributes)) {
 				return index;
 			}

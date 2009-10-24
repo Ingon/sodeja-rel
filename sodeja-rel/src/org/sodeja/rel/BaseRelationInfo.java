@@ -20,17 +20,17 @@ class BaseRelationInfo {
 	public final Set<Long> updateSet;
 	public final Set<Long> deleteSet;
 	
-	public final Map<BaseRelation, Set<Long>> starvingEntities; 
+	public final Map<ForeignKey, Set<Long>> starvingEntities; 
 	
 	public BaseRelationInfo() {
 		this(new PersistentSet<BaseEntity>(), new PersistentMap<Long, BaseEntity>(), 
 				new BaseRelationIndex(new TreeSet<Attribute>()), new BaseRelationIndexes(),
-				new TreeSet<Long>(), new TreeSet<Long>(), new TreeSet<Long>(), new HashMap<BaseRelation, Set<Long>>());
+				new TreeSet<Long>(), new TreeSet<Long>(), new TreeSet<Long>(), new HashMap<ForeignKey, Set<Long>>());
 	}
 
 	public BaseRelationInfo(PersistentSet<BaseEntity> entities, PersistentMap<Long, BaseEntity> entityMap, 
 			BaseRelationIndex pkIndex, BaseRelationIndexes fkIndexes,
-			Set<Long> newSet, Set<Long> updateSet, Set<Long> deleteSet, Map<BaseRelation, Set<Long>> starvedEntities) {
+			Set<Long> newSet, Set<Long> updateSet, Set<Long> deleteSet, Map<ForeignKey, Set<Long>> starvedEntities) {
 
 		this.entities = entities;
 		this.entityMap = entityMap;
@@ -56,7 +56,7 @@ class BaseRelationInfo {
 
 	public BaseRelationInfo clearCopy() {
 		return new BaseRelationInfo(entities, entityMap, pkIndex, fkIndexes, 
-				new TreeSet<Long>(), new TreeSet<Long>(), new TreeSet<Long>(), new HashMap<BaseRelation, Set<Long>>());
+				new TreeSet<Long>(), new TreeSet<Long>(), new TreeSet<Long>(), new HashMap<ForeignKey, Set<Long>>());
 	}
 	
 	protected Set<Long> updateSet() {

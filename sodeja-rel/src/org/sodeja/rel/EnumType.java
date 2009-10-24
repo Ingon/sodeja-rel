@@ -11,4 +11,9 @@ class EnumType implements Type {
 	public boolean accepts(Object o) {
 		return internal == o.getClass();
 	}
+
+	@Override
+	public Object canonize(Object o) {
+		return o;
+	}
 }
