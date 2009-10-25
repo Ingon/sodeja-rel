@@ -1,6 +1,7 @@
 package org.sodeja.rel;
 
 import java.util.Date;
+import java.util.Set;
 
 public enum Types implements Type {
 	STRING(String.class),
@@ -16,7 +17,8 @@ public enum Types implements Type {
 	},
 	DOUBLE(double.class, Double.class),
 	DATE(Date.class), 
-	BOOL(boolean.class, Boolean.class);
+	BOOL(boolean.class, Boolean.class), 
+	SET(Set.class);
 	
 	private final Class<?>[] supported;
 	
