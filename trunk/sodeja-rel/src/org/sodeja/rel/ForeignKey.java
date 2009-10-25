@@ -75,4 +75,12 @@ public class ForeignKey {
 	public void validateTargetAttributes(Set<String> attributes) {
 		foreignRelation.resolveAttributes(attributes);
 	}
+	
+	public Set<AttributeMapping> invertedMapping() {
+		return SetUtils.maps(mappings, new Function1<AttributeMapping, AttributeMapping>() {
+			@Override
+			public AttributeMapping execute(AttributeMapping p) {
+				return new AttributeMapping(p.target, p.source);
+			}});
+	}
 }
