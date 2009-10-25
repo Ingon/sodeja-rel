@@ -3,6 +3,9 @@ package org.sodeja.rel;
 import java.util.Collections;
 import java.util.Set;
 import java.util.SortedSet;
+import java.util.TreeSet;
+
+import org.sodeja.collections.SetUtils;
 
 public class Entity {
 	protected final SortedSet<AttributeValue> values;
@@ -54,5 +57,11 @@ public class Entity {
 	@Override
 	public String toString() {
 		return values.toString();
+	}
+	
+	public Entity extend(AttributeValue... vals) {
+		SortedSet<AttributeValue> nvals = new TreeSet<AttributeValue>(values);
+		nvals.addAll(SetUtils.asSet(vals));
+		return new Entity(nvals);
 	}
 }
