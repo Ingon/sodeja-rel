@@ -64,4 +64,13 @@ public class Entity {
 		nvals.addAll(SetUtils.asSet(vals));
 		return new Entity(nvals);
 	}
+	
+	public boolean onlyNulls() {
+		for(AttributeValue v : values) {
+			if(v.value != null) {
+				return false;
+			}
+		}
+		return true;
+	}
 }

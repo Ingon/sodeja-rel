@@ -35,14 +35,10 @@ public class MasterDetailsJoin extends BinaryRelation {
 		
 		Map<Entity, Set<Entity>> masterDetails = new HashMap<Entity, Set<Entity>>();
 		for(Entity master : masterEntities) {
+			masterDetails.put(master, new HashSet<Entity>());
 			for(Entity detail : detailsEntities) {
 				if(connected(master, detail)) {
-					Set<Entity> details = masterDetails.get(master);
-					if(details == null) {
-						details = new HashSet<Entity>();
-						masterDetails.put(master, details);
-					}
-					details.add(detail);
+					masterDetails.get(master).add(detail);
 				}
 			}
 		}
