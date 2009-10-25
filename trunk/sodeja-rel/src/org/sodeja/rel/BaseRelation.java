@@ -155,7 +155,7 @@ public class BaseRelation implements Relation, BaseRelationListener {
 		for(ForeignKey fk : fks) {
 			Set<Entity> pkIndex = fk.foreignRelation.getPkIndex().index();
 			Entity pk = fk.toTargetPk(e);
-			if (! pkIndex.contains(pk)) {
+			if (! (pk.onlyNulls() || pkIndex.contains(pk))) {
 				Set<Long> starvingIds = currentInfo.starvingEntities.get(fk);
 				if(starvingIds == null) {
 					starvingIds = new HashSet<Long>();

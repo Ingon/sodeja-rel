@@ -45,7 +45,15 @@ public class ForeignKey {
 				return p.source;
 			}});
 	}
-	
+
+	public Set<Attribute> getTargetAttributes() {
+		return CollectionUtils.map(mappings, new TreeSet<Attribute>(), new Function1<Attribute, AttributeMapping>() {
+			@Override
+			public Attribute execute(AttributeMapping p) {
+				return p.target;
+			}});
+	}
+
 	public Entity toTargetPk(final Entity source) {
 		SortedSet<AttributeValue> values = SetUtils.maps(mappings, new Function1<AttributeValue, AttributeMapping>() {
 			@Override
@@ -69,7 +77,15 @@ public class ForeignKey {
 	}
 
 	public Entity selectPk(Entity source) {
-		return foreignRelation.selectByPk(toTargetPk(source));
+		Entity targetPk = toTargetPk(source);
+		if(targetPk.onlyNulls()) {
+			return new Entity(SetUtils.maps(foreignRelation.attributes, new Function1<AttributeValue, Attribute>() {
+				@Override
+				public AttributeValue execute(Attribute p) {
+					return new AttributeValue(p, null);
+				}}));
+		}
+		return foreignRelation.selectByPk(targetPk);
 	}
 	
 	public void validateTargetAttributes(Set<String> attributes) {
