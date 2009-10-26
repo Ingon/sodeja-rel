@@ -88,6 +88,10 @@ public class ForeignKey {
 		return foreignRelation.selectByPk(targetPk);
 	}
 	
+	public Set<Entity> select() {
+		return foreignRelation.select();
+	}
+	
 	public void validateTargetAttributes(Set<String> attributes) {
 		foreignRelation.resolveAttributes(attributes);
 	}

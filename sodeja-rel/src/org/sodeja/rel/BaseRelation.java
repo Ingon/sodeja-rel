@@ -613,4 +613,8 @@ public class BaseRelation implements Relation, BaseRelationListener {
 		}
 		return fk.mappings;
 	}
+	
+	public Set<ForeignKey> getFks() {
+		return Collections.unmodifiableSet(fks);
+	}
 }
