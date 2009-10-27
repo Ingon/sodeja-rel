@@ -92,6 +92,14 @@ public class ForeignKey {
 		return foreignRelation.select();
 	}
 	
+	public Set<Entity> selectResolved() {
+		Relation resolvedRelation = foreignRelation.domain.resolveUnknown(foreignRelation.getName() + "Resolved");
+		if(resolvedRelation != null) {
+			return resolvedRelation.select();
+		}
+		return select();
+	}
+	
 	public void validateTargetAttributes(Set<String> attributes) {
 		foreignRelation.resolveAttributes(attributes);
 	}

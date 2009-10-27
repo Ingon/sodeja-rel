@@ -48,6 +48,11 @@ public class Domain {
 		return new EnumType(enu);
 	}
 	
+	// TODO hack really
+	public Relation resolveUnknown(String name) {
+		return relations.get(name);
+	}
+	
 	public Relation resolve(String name) {
 		Relation rel = relations.get(name);
 		if(rel == null) {
