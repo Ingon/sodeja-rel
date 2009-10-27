@@ -617,4 +617,8 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	public Set<ForeignKey> getFks() {
 		return Collections.unmodifiableSet(fks);
 	}
+	
+	public Set<Attribute> getAttributes() {
+		return Collections.unmodifiableSet(attributes);
+	}
 }

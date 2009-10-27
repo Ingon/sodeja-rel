@@ -68,11 +68,11 @@ class TransactionManagerImpl implements TransactionManager {
 		boolean result = versionRef.compareAndSet(info.version, new Version(verId, info.relationInfo, info.version));
 		if(! result) {
 			Version ver = versionRef.get();
-			if(containsConflictingChanges(ver, info)) {
+			if(containsConflictingChanges(ver, info)) { 
 				rollback();
 				throw new RollbackException("");
 			}
-			Map<BaseRelation, BaseRelationInfo> relationInfo = merge(ver, info);
+			Map<BaseRelation, BaseRelationInfo> relationInfo = merge(ver, info); // TODO here after merge we should again perform integrity checks!
 			Version newVersion = new Version(verId, relationInfo, ver);
 			result = versionRef.compareAndSet(ver, newVersion);
 			if(! result) {

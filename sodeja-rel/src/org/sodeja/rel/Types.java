@@ -18,6 +18,7 @@ public enum Types implements Type {
 	DOUBLE(double.class, Double.class),
 	DATE(Date.class), 
 	BOOL(boolean.class, Boolean.class), 
+	ENTITY(Entity.class),
 	SET(Set.class);
 	
 	private final Class<?>[] supported;
