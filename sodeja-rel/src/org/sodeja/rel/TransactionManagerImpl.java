@@ -55,14 +55,9 @@ class TransactionManagerImpl implements TransactionManager {
 		}
 		
 		waitOtherTransactions(info);
-		if(comitting.get()) {
-			throw new RuntimeException("!!!!!!!!!!!");
-		}
 		try {
-			comitting.set(true);
 			commitTransaction(info);
 		} finally {
-			comitting.set(false);
 			clearInfo(info);
 		}
 	}
@@ -117,7 +112,7 @@ class TransactionManagerImpl implements TransactionManager {
 	}
 
 	private void clearInfo(TransactionInfo info) {
-		order.remove(info);
+		order.poll();
 		state.remove();
 		info.version.transactionInfoCount.decrementAndGet();
 		

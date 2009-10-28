@@ -1,53 +1,54 @@
 package org.sodeja.rel;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 
-import org.sodeja.collections.PersistentSet;
-
 public class BaseRelationIndexes {
-	public final PersistentSet<BaseRelationIndex> indexes;
+	private final Map<Set<Attribute>, BaseRelationIndex> indexes;
 
 	protected BaseRelationIndexes() {
-		this.indexes = new PersistentSet<BaseRelationIndex>();
+		this(new HashMap<Set<Attribute>, BaseRelationIndex>());
 	}
 	
-	private BaseRelationIndexes(PersistentSet<BaseRelationIndex> fkIndexes) {
-		this.indexes = fkIndexes;
+	private BaseRelationIndexes(Map<Set<Attribute>, BaseRelationIndex> indexes) {
+		this.indexes = Collections.unmodifiableMap(indexes);
 	}
 
 	public BaseRelationIndexes insert(Entity val) {
-		PersistentSet<BaseRelationIndex> newFkIndexes = indexes;
-		for(BaseRelationIndex index : newFkIndexes) {
-			newFkIndexes = newFkIndexes.addValue(index.insert(val));
+		Map<Set<Attribute>, BaseRelationIndex> newIndexes = new HashMap<Set<Attribute>, BaseRelationIndex>();
+		for(Map.Entry<Set<Attribute>, BaseRelationIndex> index : indexes.entrySet()) {
+			newIndexes.put(index.getKey(), index.getValue().insert(val));
 		}
-		return new BaseRelationIndexes(newFkIndexes);
+		return new BaseRelationIndexes(newIndexes);
 	}
 
 	public BaseRelationIndexes delete(Entity val) {
-		PersistentSet<BaseRelationIndex> newFkIndexes = indexes;
-		for(BaseRelationIndex index : newFkIndexes) {
-			newFkIndexes = newFkIndexes.addValue(index.delete(val));
+		Map<Set<Attribute>, BaseRelationIndex> newIndexes = new HashMap<Set<Attribute>, BaseRelationIndex>();
+		for(Map.Entry<Set<Attribute>, BaseRelationIndex> index : indexes.entrySet()) {
+			newIndexes.put(index.getKey(), index.getValue().delete(val));
 		}
-		return new BaseRelationIndexes(newFkIndexes);
+		return new BaseRelationIndexes(newIndexes);
 	}
 	
 	public BaseRelationIndexes addIndex(BaseRelationIndex index) {
-		if(indexes.contains(index)) {
+		if(indexes.containsKey(index.attributes)) {
 			return this;
 		}
-		return new BaseRelationIndexes(indexes.addValue(index));
+		
+		Map<Set<Attribute>, BaseRelationIndex> newIndexes = new HashMap<Set<Attribute>, BaseRelationIndex>(indexes);
+		newIndexes.put(index.attributes, index);
+		return new BaseRelationIndexes(newIndexes);
 	}
 
 	public BaseRelationIndexes removeIndex(BaseRelationIndex index) {
-		return new BaseRelationIndexes(indexes.removeValue(index));
+		Map<Set<Attribute>, BaseRelationIndex> newIndexes = new HashMap<Set<Attribute>, BaseRelationIndex>(indexes);
+		newIndexes.remove(index.attributes);
+		return new BaseRelationIndexes(newIndexes);
 	}
 	
 	public BaseRelationIndex indexFor(Set<Attribute> attributes) { // TODO could be cached with PersistentMap
-		for(BaseRelationIndex index : indexes) {
-			if(index.attributes.equals(attributes)) {
-				return index;
-			}
-		}
-		throw new RuntimeException("Attributes should be indexed for sure");
+		return indexes.get(attributes);
 	}
 }
