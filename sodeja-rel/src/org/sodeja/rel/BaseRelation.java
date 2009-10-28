@@ -11,7 +11,6 @@ import java.util.TreeSet;
 
 import org.sodeja.collections.ArrayUtils;
 import org.sodeja.collections.CollectionUtils;
-import org.sodeja.collections.PersistentMap;
 import org.sodeja.collections.PersistentSet;
 import org.sodeja.collections.SetUtils;
 import org.sodeja.functional.Function1;
@@ -48,13 +47,13 @@ public class BaseRelation implements Relation, BaseRelationListener {
 		
 		BaseRelationInfo info = getInfo(); // By default whole attribute set is the PK
 		pk = this.attributes;
-		setInfo(info.copyDelta(info.entities, info.entityMap, new BaseRelationIndex(pk), info.fkIndexes));
+		setInfo(info.copyDelta(info.entities, new BaseRelationIndex(pk), info.fkIndexes));
 	}
 	
 	public BaseRelation primaryKey(String... attributeNames) {
 		pk = resolveAttributes(attributeNames);
 		BaseRelationInfo info = getInfo();
-		setInfo(info.copyDelta(info.entities, info.entityMap, new BaseRelationIndex(pk), info.fkIndexes));
+		setInfo(info.copyDelta(info.entities, new BaseRelationIndex(pk), info.fkIndexes));
 		
 		return this;
 	}
@@ -95,7 +94,7 @@ public class BaseRelation implements Relation, BaseRelationListener {
 		target.listeners.add(this);
 		
 		BaseRelationInfo info = getInfo();
-		setInfo(info.copyDelta(info.entities, info.entityMap, info.pkIndex, info.fkIndexes.addIndex(new BaseRelationIndex(fkIndexAttributes))));
+		setInfo(info.copyDelta(info.entities, info.pkIndex, info.fkIndexes.addIndex(new BaseRelationIndex(fkIndexAttributes))));
 		
 		return this;
 	}
@@ -117,19 +116,18 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	}
 	
 	public void insert(Set<Pair<String, Object>> attributeValues) {
-		BaseEntity e = new BaseEntity(idGen.next(), extractValues(attributeValues, true));
+		Entity e = new Entity(extractValues(attributeValues, true));
 		
 		BaseRelationInfo currentInfo = getInfo();
 		
-		PersistentSet<BaseEntity> entities = currentInfo.entities.addValue(e);
-		PersistentMap<Long, BaseEntity> entityMap = currentInfo.entityMap.putValue(e.id, e);
+		PersistentSet<Entity> entities = currentInfo.entities.addValue(e);
 		
 		BaseRelationIndex newPkIndex = currentInfo.pkIndex.insert(e);
 		BaseRelationIndexes newFkIndexes = currentInfo.fkIndexes.insert(e);
 		
-		currentInfo.newSet.add(e.id);
+		currentInfo.newSet.add(e);
 		
-		setInfo(currentInfo.copyDelta(entities, entityMap, newPkIndex, newFkIndexes));
+		setInfo(currentInfo.copyDelta(entities, newPkIndex, newFkIndexes));
 		
 		checkForeignKeys(currentInfo, e);
 		
@@ -138,30 +136,30 @@ public class BaseRelation implements Relation, BaseRelationListener {
 		}
 	}
 
-	private void removeFromStarving(BaseRelationInfo currentInfo, BaseEntity e) {
-		for(Iterator<Map.Entry<ForeignKey, Set<Long>>> ite = currentInfo.starvingEntities.entrySet().iterator(); ite.hasNext(); ) {
-			Map.Entry<ForeignKey, Set<Long>> en = ite.next();
-			Set<Long> starvingIds = en.getValue();
+	private void removeFromStarving(BaseRelationInfo currentInfo, Entity e) {
+		for(Iterator<Map.Entry<ForeignKey, Set<Entity>>> ite = currentInfo.starvingEntities.entrySet().iterator(); ite.hasNext(); ) {
+			Map.Entry<ForeignKey, Set<Entity>> en = ite.next();
+			Set<Entity> starvingIds = en.getValue();
 			if(starvingIds == null || starvingIds.isEmpty()) {
 				continue;
 			}
-			if(starvingIds.remove(e.id) && starvingIds.isEmpty()) {
+			if(starvingIds.remove(e) && starvingIds.isEmpty()) {
 				ite.remove();
 			}
 		}
 	}
 	
-	private void checkForeignKeys(BaseRelationInfo currentInfo, BaseEntity e) {
+	private void checkForeignKeys(BaseRelationInfo currentInfo, Entity e) {
 		for(ForeignKey fk : fks) {
 			Set<Entity> pkIndex = fk.foreignRelation.getPkIndex().index();
 			Entity pk = fk.toTargetPk(e);
 			if (! (pk.onlyNulls() || pkIndex.contains(pk))) {
-				Set<Long> starvingIds = currentInfo.starvingEntities.get(fk);
+				Set<Entity> starvingIds = currentInfo.starvingEntities.get(fk);
 				if(starvingIds == null) {
-					starvingIds = new HashSet<Long>();
+					starvingIds = new HashSet<Entity>();
 					currentInfo.starvingEntities.put(fk, starvingIds);
 				}
-				starvingIds.add(e.id);
+				starvingIds.add(e);
 			}
 		}
 	}
@@ -175,7 +173,7 @@ public class BaseRelation implements Relation, BaseRelationListener {
 			}});
 		if(pkValues.size() == pk.size()) {
 			Entity pk = new Entity(pkValues);
-			PersistentSet<BaseEntity> entities = getInfo().pkIndex.find(pk);
+			PersistentSet<Entity> entities = getInfo().pkIndex.find(pk);
 			if(pkValues.size() == values.size()) {
 				updateAll(entities, newAttributeValues);
 			} else {
@@ -211,29 +209,29 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	public void update(Condition cond, Set<Pair<String, Object>> attributeValues) {
 		BaseRelationInfo currentInfo = getInfo();
 		
-		PersistentSet<BaseEntity> entities = currentInfo.entities;
-		PersistentMap<Long, BaseEntity> entityMap = currentInfo.entityMap;
+		PersistentSet<Entity> entities = currentInfo.entities;
 		
 		BaseRelationIndex newPkIndex = currentInfo.pkIndex;
 		BaseRelationIndexes newFkIndexes = currentInfo.fkIndexes;
 
-		for(BaseEntity e : entities) {
+		for(Entity e : entities) {
 			if(cond.satisfied(e)) {
 				entities = entities.removeValue(e);
 				
 				newPkIndex = newPkIndex.delete(e);
 				newFkIndexes = newFkIndexes.delete(e);
 				
-				BaseEntity oe = e;
-				e = new BaseEntity(e.id, merge(e, attributeValues));
+				currentInfo.deleteSet.add(e);
+				
+				Entity oe = e;
+				e = new Entity(merge(e, attributeValues));
 				
 				entities = entities.addValue(e);
-				entityMap = entityMap.putValue(e.id, e);
 				
 				newPkIndex = newPkIndex.insert(e);
 				newFkIndexes = newFkIndexes.insert(e);
 				
-				currentInfo.updateSet.add(e.id);
+				currentInfo.newSet.add(e);
 				
 				removeFromStarving(currentInfo, oe);
 				checkForeignKeys(currentInfo, e);
@@ -243,34 +241,34 @@ public class BaseRelation implements Relation, BaseRelationListener {
 			}
 		}
 		
-		setInfo(currentInfo.copyDelta(entities, entityMap, newPkIndex, newFkIndexes));
+		setInfo(currentInfo.copyDelta(entities, newPkIndex, newFkIndexes));
 	}
 	
-	private void updateAll(PersistentSet<BaseEntity> targetEntities, Set<Pair<String, Object>> attributeValues) {
+	private void updateAll(PersistentSet<Entity> targetEntities, Set<Pair<String, Object>> attributeValues) {
 		BaseRelationInfo currentInfo = getInfo();
 		
-		PersistentSet<BaseEntity> entities = currentInfo.entities;
-		PersistentMap<Long, BaseEntity> entityMap = currentInfo.entityMap;
+		PersistentSet<Entity> entities = currentInfo.entities;
 		
 		BaseRelationIndex newPkIndex = currentInfo.pkIndex;
 		BaseRelationIndexes newFkIndexes = currentInfo.fkIndexes;
 
-		for(BaseEntity e : targetEntities) {
+		for(Entity e : targetEntities) {
 			entities = entities.removeValue(e);
 			
 			newPkIndex = newPkIndex.delete(e);
 			newFkIndexes = newFkIndexes.delete(e);
 			
-			BaseEntity oe = e;
-			e = new BaseEntity(e.id, merge(e, attributeValues));
+			currentInfo.deleteSet.add(e);
+			
+			Entity oe = e;
+			e = new Entity(merge(e, attributeValues));
 			
 			entities = entities.addValue(e);
-			entityMap = entityMap.putValue(e.id, e);
 			
 			newPkIndex = newPkIndex.insert(e);
 			newFkIndexes = newFkIndexes.insert(e);
 			
-			currentInfo.updateSet.add(e.id);
+			currentInfo.newSet.add(e);
 
 			removeFromStarving(currentInfo, oe);
 			checkForeignKeys(currentInfo, e);
@@ -279,10 +277,10 @@ public class BaseRelation implements Relation, BaseRelationListener {
 			}
 		}
 		
-		setInfo(currentInfo.copyDelta(entities, entityMap, newPkIndex, newFkIndexes));
+		setInfo(currentInfo.copyDelta(entities, newPkIndex, newFkIndexes));
 	}
 
-	private SortedSet<AttributeValue> merge(BaseEntity e, Set<Pair<String, Object>> attributeValues) {
+	private SortedSet<AttributeValue> merge(Entity e, Set<Pair<String, Object>> attributeValues) {
 		SortedSet<AttributeValue> newValues = new TreeSet<AttributeValue>();
 		newValues.addAll(e.getValues());
 		
@@ -314,7 +312,7 @@ public class BaseRelation implements Relation, BaseRelationListener {
 			}});
 		if(pkValues.size() == pk.size()) {
 			Entity pk = new Entity(pkValues);
-			PersistentSet<BaseEntity> entities = getInfo().pkIndex.find(pk);
+			PersistentSet<Entity> entities = getInfo().pkIndex.find(pk);
 			if(pkValues.size() == values.size()) {
 				deleteAll(entities);
 			} else {
@@ -350,21 +348,19 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	public void delete(Condition cond) {
 		BaseRelationInfo currentInfo = getInfo();
 		
-		PersistentSet<BaseEntity> entities = currentInfo.entities;
-		PersistentMap<Long, BaseEntity> entityMap = currentInfo.entityMap;
+		PersistentSet<Entity> entities = currentInfo.entities;
 		
 		BaseRelationIndex newPkIndex = currentInfo.pkIndex;
 		BaseRelationIndexes newFkIndexes = currentInfo.fkIndexes;
 
-		for(BaseEntity e : entities) {
+		for(Entity e : entities) {
 			if(cond.satisfied(e)) {
 				entities = entities.removeValue(e);
-				entityMap = entityMap.removeValue(e.id);
 				
 				newPkIndex = newPkIndex.delete(e);
 				newFkIndexes = newFkIndexes.delete(e);
 				
-				currentInfo.deleteSet.add(e.id);
+				currentInfo.deleteSet.add(e);
 				
 				removeFromStarving(currentInfo, e);
 				for(BaseRelationListener l : listeners) {
@@ -373,26 +369,24 @@ public class BaseRelation implements Relation, BaseRelationListener {
 			}
 		}
 		
-		setInfo(currentInfo.copyDelta(entities, entityMap, newPkIndex, newFkIndexes));
+		setInfo(currentInfo.copyDelta(entities, newPkIndex, newFkIndexes));
 	}
 
-	private void deleteAll(Set<BaseEntity> targetEntities) {
+	private void deleteAll(Set<Entity> targetEntities) {
 		BaseRelationInfo currentInfo = getInfo();
 		
-		PersistentSet<BaseEntity> entities = currentInfo.entities;
-		PersistentMap<Long, BaseEntity> entityMap = currentInfo.entityMap;
+		PersistentSet<Entity> entities = currentInfo.entities;
 		
 		BaseRelationIndex newPkIndex = currentInfo.pkIndex;
 		BaseRelationIndexes newFkIndexes = currentInfo.fkIndexes;
 
-		for(BaseEntity e : targetEntities) {
+		for(Entity e : targetEntities) {
 			entities = entities.removeValue(e);
-			entityMap = entityMap.removeValue(e.id);
 			
 			newPkIndex = newPkIndex.delete(e);
 			newFkIndexes = newFkIndexes.delete(e);
 			
-			currentInfo.deleteSet.add(e.id);
+			currentInfo.deleteSet.add(e);
 			
 			removeFromStarving(currentInfo, e);
 			for(BaseRelationListener l : listeners) {
@@ -400,7 +394,7 @@ public class BaseRelation implements Relation, BaseRelationListener {
 			}
 		}
 		
-		setInfo(currentInfo.copyDelta(entities, entityMap, newPkIndex, newFkIndexes));
+		setInfo(currentInfo.copyDelta(entities, newPkIndex, newFkIndexes));
 	}
 	
 	private SortedSet<AttributeValue> extractValues(Set<Pair<String, Object>> attributeValues, boolean strict) {
@@ -435,12 +429,12 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	}
 
 	protected Entity selectByPk(Entity pk) {
-		PersistentSet<BaseEntity> e = getInfo().pkIndex.find(pk);
+		PersistentSet<Entity> e = getInfo().pkIndex.find(pk);
 		if(e == null || e.isEmpty()) {
 			return null;
 		}
 		
-		Iterator<BaseEntity> ite = e.iterator();
+		Iterator<Entity> ite = e.iterator();
 		if(! ite.hasNext()) {
 			throw new RuntimeException("Set is not empty but the iterator does not return elemens ?");
 		}
@@ -469,7 +463,7 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	}
 
 	private void checkPrimaryKey() {
-		PersistentSet<BaseEntity> entities = getInfo().entities;
+		PersistentSet<Entity> entities = getInfo().entities;
 		int pkIndexSize = getInfo().pkIndex.size();
 		if(entities.size() != pkIndexSize) {
 			throw new ConstraintViolationException(name + ": Primary key constraint violated");
@@ -479,7 +473,7 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	private void checkForeignKeys() {
 		BaseRelationInfo info = getInfo();
 		if(! info.starvingEntities.isEmpty()) {
-			for(Map.Entry<ForeignKey, Set<Long>> e : info.starvingEntities.entrySet()) {
+			for(Map.Entry<ForeignKey, Set<Entity>> e : info.starvingEntities.entrySet()) {
 				throw new ConstraintViolationException(name + ": Foreign key to " + e.getKey().foreignRelation.name + " violated");
 			}
 		}
@@ -494,7 +488,7 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	}
 
 	@Override
-	public void inserted(BaseRelation relation, BaseEntity entity) {
+	public void inserted(BaseRelation relation, Entity entity) {
 		BaseRelationInfo info = getInfo();
 		
 		for(ForeignKey fk : fks) {
@@ -502,15 +496,15 @@ public class BaseRelation implements Relation, BaseRelationListener {
 				continue;
 			}
 			
-			Set<Long> starvingIds = info.starvingEntities.get(fk);
+			Set<Entity> starvingIds = info.starvingEntities.get(fk);
 			if(starvingIds == null || starvingIds.isEmpty()) {
 				return;
 			}
 			
 			Entity fkEntity = fk.toSourceFk(entity);
-			for(Iterator<Long> ite = starvingIds.iterator(); ite.hasNext(); ) {
-				Long l = ite.next();
-				if(subsetOf(info.entityMap.get(l), fkEntity)) {
+			for(Iterator<Entity> ite = starvingIds.iterator(); ite.hasNext(); ) {
+				Entity l = ite.next();
+				if(subsetOf(l, fkEntity)) {
 					ite.remove();
 				}
 			}
@@ -521,13 +515,13 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	}
 
 	@Override
-	public void updated(BaseRelation relation, BaseEntity oldEntity, BaseEntity newEntity) {
+	public void updated(BaseRelation relation, Entity oldEntity, Entity newEntity) {
 		deleted(relation, oldEntity);
 		inserted(relation, newEntity);
 	}
 
 	@Override
-	public void deleted(BaseRelation relation, BaseEntity entity) {
+	public void deleted(BaseRelation relation, Entity entity) {
 		BaseRelationInfo info = getInfo();
 		
 		for(ForeignKey fk : fks) {
@@ -535,24 +529,24 @@ public class BaseRelation implements Relation, BaseRelationListener {
 				continue;
 			}
 			
-			Set<Long> starvingIds = info.starvingEntities.get(fk);
+			Set<Entity> starvingIds = info.starvingEntities.get(fk);
 			BaseRelationIndex index = info.fkIndexes.indexFor(fk.getSourceAttributes());
 			Entity fkOldEntity = fk.toSourceFk(entity);
-			Set<BaseEntity> oldEntities = index.find(fkOldEntity);
+			Set<Entity> oldEntities = index.find(fkOldEntity);
 			if(oldEntities != null) {
 				if(starvingIds == null) {
-					starvingIds = new HashSet<Long>();
+					starvingIds = new HashSet<Entity>();
 					info.starvingEntities.put(fk, starvingIds);
 				}
 				
-				for(BaseEntity e : oldEntities) {
-					starvingIds.add(e.id);
+				for(Entity e : oldEntities) {
+					starvingIds.add(e);
 				}
 			}
 		}
 	}
 
-	private boolean subsetOf(BaseEntity baseEntity, Entity fkEntity) {
+	private boolean subsetOf(Entity baseEntity, Entity fkEntity) {
 		for(AttributeValue fv : fkEntity.values) {
 			AttributeValue v = baseEntity.getAttributeValue(fv.attribute);
 			if(! ObjectUtils.equalsIfNull(fv.value, v.value)) {

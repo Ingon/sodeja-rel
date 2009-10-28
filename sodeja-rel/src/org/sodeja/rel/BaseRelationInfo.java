@@ -6,119 +6,85 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
-import org.sodeja.collections.PersistentMap;
 import org.sodeja.collections.PersistentSet;
 
 class BaseRelationInfo {
-	public final PersistentSet<BaseEntity> entities;
-	public final PersistentMap<Long, BaseEntity> entityMap;
+	public final PersistentSet<Entity> entities;
 	
 	public final BaseRelationIndex pkIndex;
 	public final BaseRelationIndexes fkIndexes;
 	
-	public final Set<Long> newSet;
-	public final Set<Long> updateSet;
-	public final Set<Long> deleteSet;
+	public final Set<Entity> newSet;
+	public final Set<Entity> deleteSet;
 	
-	public final Map<ForeignKey, Set<Long>> starvingEntities; 
+	public final Map<ForeignKey, Set<Entity>> starvingEntities; 
 	
 	public BaseRelationInfo() {
-		this(new PersistentSet<BaseEntity>(), new PersistentMap<Long, BaseEntity>(), 
+		this(new PersistentSet<Entity>(),
 				new BaseRelationIndex(new TreeSet<Attribute>()), new BaseRelationIndexes(),
-				new TreeSet<Long>(), new TreeSet<Long>(), new TreeSet<Long>(), new HashMap<ForeignKey, Set<Long>>());
+				new HashSet<Entity>(), new HashSet<Entity>(), new HashMap<ForeignKey, Set<Entity>>());
 	}
 
-	public BaseRelationInfo(PersistentSet<BaseEntity> entities, PersistentMap<Long, BaseEntity> entityMap, 
+	public BaseRelationInfo(PersistentSet<Entity> entities, 
 			BaseRelationIndex pkIndex, BaseRelationIndexes fkIndexes,
-			Set<Long> newSet, Set<Long> updateSet, Set<Long> deleteSet, Map<ForeignKey, Set<Long>> starvedEntities) {
+			Set<Entity> newSet, Set<Entity> deleteSet, Map<ForeignKey, Set<Entity>> starvedEntities) {
 
 		this.entities = entities;
-		this.entityMap = entityMap;
 		
 		this.pkIndex = pkIndex;
 		this.fkIndexes = fkIndexes;
 		
 		this.newSet = newSet;
-		this.updateSet = updateSet;
 		this.deleteSet = deleteSet;
 		
 		this.starvingEntities = starvedEntities;
 	}
 	
 	public boolean hasChanges() {
-		return ! (newSet.isEmpty() && updateSet.isEmpty() && deleteSet.isEmpty());
+		return ! (newSet.isEmpty() && deleteSet.isEmpty());
 	}
 	
-	public BaseRelationInfo copyDelta(PersistentSet<BaseEntity> entities, PersistentMap<Long, BaseEntity> entityMap, 
-			BaseRelationIndex pkIndex, BaseRelationIndexes fkIndexes) {
-		return new BaseRelationInfo(entities, entityMap, pkIndex, fkIndexes, this.newSet, this.updateSet, this.deleteSet, this.starvingEntities);
+	public BaseRelationInfo copyDelta(PersistentSet<Entity> entities, BaseRelationIndex pkIndex, BaseRelationIndexes fkIndexes) {
+		return new BaseRelationInfo(entities, pkIndex, fkIndexes, this.newSet, this.deleteSet, this.starvingEntities);
 	}
 
 	public BaseRelationInfo clearCopy() {
-		return new BaseRelationInfo(entities, entityMap, pkIndex, fkIndexes, 
-				new TreeSet<Long>(), new TreeSet<Long>(), new TreeSet<Long>(), new HashMap<ForeignKey, Set<Long>>());
+		return new BaseRelationInfo(entities, pkIndex, fkIndexes, 
+				new HashSet<Entity>(), new HashSet<Entity>(), new HashMap<ForeignKey, Set<Entity>>());
 	}
 	
-	protected Set<Long> updateSet() {
-		Set<Long> set = new HashSet<Long>();
-		set.addAll(newSet);
-		set.addAll(updateSet);
-		return set;
-	}
-	
-	protected Set<Long> changeSet() {
-		Set<Long> set = new HashSet<Long>();
-		set.addAll(updateSet);
-		set.addAll(deleteSet);
-		return set;
-	}
+//	protected Set<Entity> updateSet() {
+//		Set<Entity> set = new HashSet<Entity>();
+//		set.addAll(newSet);
+//		return set;
+//	}
+//	
+//	protected Set<Entity> changeSet() {
+//		Set<Entity> set = new HashSet<Entity>();
+//		set.addAll(deleteSet);
+//		return set;
+//	}
 
 	protected BaseRelationInfo merge(BaseRelationInfo versionInfo) {
-		PersistentSet<BaseEntity> newEntities = entities;
-		PersistentMap<Long, BaseEntity> newEntityMap = entityMap;
+		PersistentSet<Entity> newEntities = entities;
 		BaseRelationIndex newPkIndex = pkIndex;
 		BaseRelationIndexes newFkIndexes = fkIndexes;
 		
-		for(Long id : versionInfo.newSet) {
-			BaseEntity e = versionInfo.entityMap.get(id);
-			
+		for(Entity e : versionInfo.newSet) {
 			newEntities = newEntities.addValue(e);
-			newEntityMap = newEntityMap.putValue(id, e);
 			
 			newPkIndex = newPkIndex.insert(e);
 			newFkIndexes = newFkIndexes.insert(e);
 		}
 		
-		for(Long id : versionInfo.updateSet) {
-			BaseEntity ne = versionInfo.entityMap.get(id);
-			BaseEntity oe = newEntityMap.get(id);
-			
+		for(Entity oe : versionInfo.deleteSet) {
 			newEntities = newEntities.removeValue(oe);
-			
-			newPkIndex = newPkIndex.delete(oe);
-			newFkIndexes = newFkIndexes.delete(oe);
-			
-			newEntities = newEntities.addValue(ne);
-			newEntityMap = newEntityMap.putValue(id, ne);
-			
-			newPkIndex = newPkIndex.insert(ne);
-			newFkIndexes = newFkIndexes.insert(ne);
-		}
-		
-		for(Long id : versionInfo.deleteSet) {
-			BaseEntity oe = newEntityMap.get(id);
-			if(oe == null) {
-				continue;
-			}
-			
-			newEntities = newEntities.removeValue(oe);
-			newEntityMap = newEntityMap.removeValue(id);
 			
 			newPkIndex = newPkIndex.delete(oe);
 			newFkIndexes = newFkIndexes.delete(oe);
 		}
 		
-		return new BaseRelationInfo(newEntities, newEntityMap, newPkIndex, newFkIndexes, 
-				this.newSet, this.updateSet, this.deleteSet, this.starvingEntities);
+		return new BaseRelationInfo(newEntities, newPkIndex, newFkIndexes, 
+				this.newSet, this.deleteSet, this.starvingEntities);
 	}
 }

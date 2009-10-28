@@ -9,49 +9,49 @@ import org.sodeja.collections.PersistentSet;
 
 class BaseRelationIndex {
 	public final Set<Attribute> attributes;
-	public final PersistentMap<Entity, PersistentSet<BaseEntity>> index;
+	public final PersistentMap<Entity, PersistentSet<Entity>> index;
 	
 	public BaseRelationIndex(Set<Attribute> attributes) {
 		this.attributes = attributes;
-		this.index = new PersistentMap<Entity, PersistentSet<BaseEntity>>();
+		this.index = new PersistentMap<Entity, PersistentSet<Entity>>();
 	}
 	
-	public BaseRelationIndex(Set<Attribute> attributes, PersistentMap<Entity, PersistentSet<BaseEntity>> index) {
+	public BaseRelationIndex(Set<Attribute> attributes, PersistentMap<Entity, PersistentSet<Entity>> index) {
 		this.attributes = attributes;
 		this.index = index;
 	}
 	
-	public BaseRelationIndex insert(BaseEntity val) {
+	public BaseRelationIndex insert(Entity val) {
 		if(attributes.isEmpty()) {
 			return this;
 		}
 		
 		Entity valIndex = extract(val);
 		
-		PersistentSet<BaseEntity> entitesForIndex = index.get(valIndex);
+		PersistentSet<Entity> entitesForIndex = index.get(valIndex);
 		if(entitesForIndex == null) {
-			entitesForIndex = new PersistentSet<BaseEntity>();
+			entitesForIndex = new PersistentSet<Entity>();
 		}
-		PersistentSet<BaseEntity> newEntitiesForIndex = entitesForIndex.addValue(val);
-		PersistentMap<Entity, PersistentSet<BaseEntity>> newIndex = index.putValue(valIndex, newEntitiesForIndex);
+		PersistentSet<Entity> newEntitiesForIndex = entitesForIndex.addValue(val);
+		PersistentMap<Entity, PersistentSet<Entity>> newIndex = index.putValue(valIndex, newEntitiesForIndex);
 		
 		return new BaseRelationIndex(attributes, newIndex);
 	}
 
-	public BaseRelationIndex delete(BaseEntity val) {
+	public BaseRelationIndex delete(Entity val) {
 		if(attributes.isEmpty()) {
 			return this;
 		}
 		
 		Entity valIndex = extract(val);
 		
-		PersistentSet<BaseEntity> entitesForIndex = index.get(valIndex);
+		PersistentSet<Entity> entitesForIndex = index.get(valIndex);
 		if(entitesForIndex == null) {
 			throw new RuntimeException("An unindexed value ?!?!?");
 		}
 		
-		PersistentSet<BaseEntity> newEntitiesForIndex = entitesForIndex.removeValue(val);
-		PersistentMap<Entity, PersistentSet<BaseEntity>> newIndex = index;
+		PersistentSet<Entity> newEntitiesForIndex = entitesForIndex.removeValue(val);
+		PersistentMap<Entity, PersistentSet<Entity>> newIndex = index;
 		if(newEntitiesForIndex.isEmpty()) {
 			newIndex = index.removeValue(valIndex);
 		} else {
@@ -73,7 +73,7 @@ class BaseRelationIndex {
 		return new Entity(pkValues);
 	}
 
-	public PersistentSet<BaseEntity> find(Entity pk) {
+	public PersistentSet<Entity> find(Entity pk) {
 		return index.get(pk);
 	}
 	

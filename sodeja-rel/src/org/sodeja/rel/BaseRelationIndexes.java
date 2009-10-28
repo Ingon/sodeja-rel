@@ -15,7 +15,7 @@ public class BaseRelationIndexes {
 		this.indexes = fkIndexes;
 	}
 
-	public BaseRelationIndexes insert(BaseEntity val) {
+	public BaseRelationIndexes insert(Entity val) {
 		PersistentSet<BaseRelationIndex> newFkIndexes = indexes;
 		for(BaseRelationIndex index : newFkIndexes) {
 			newFkIndexes = newFkIndexes.addValue(index.insert(val));
@@ -23,7 +23,7 @@ public class BaseRelationIndexes {
 		return new BaseRelationIndexes(newFkIndexes);
 	}
 
-	public BaseRelationIndexes delete(BaseEntity val) {
+	public BaseRelationIndexes delete(Entity val) {
 		PersistentSet<BaseRelationIndex> newFkIndexes = indexes;
 		for(BaseRelationIndex index : newFkIndexes) {
 			newFkIndexes = newFkIndexes.addValue(index.delete(val));

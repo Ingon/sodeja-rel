@@ -33,7 +33,7 @@ public class AttributeValue implements Comparable<AttributeValue> {
 	public int compareTo(AttributeValue o) {
 		int temp = attribute.compareTo(o.attribute);
 		if(temp == 0 && value instanceof Comparable<?>) {
-			temp = ((Comparable) value).compareTo(o.value);
+			temp = ((Comparable<Object>) (Object) value).compareTo(o.value);
 		}
 		return temp;
 	}
