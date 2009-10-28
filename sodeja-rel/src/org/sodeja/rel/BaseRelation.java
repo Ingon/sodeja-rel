@@ -288,13 +288,15 @@ public class BaseRelation implements Relation, BaseRelationListener {
 		
 		for(Pair<String, Object> value : attributeValues) {
 			AttributeValue oldValue = e.getAttributeValue(value.first);
-			Attribute att = oldValue.attribute;
 			if(oldValue == null) {
 				throw new RuntimeException("Unknown attribute " + value.first);
 			}
+			
+			Attribute att = oldValue.attribute;
 			if(! att.type.accepts(value.second)) {
 				throw new RuntimeException("Wrong type for attribute " + value.first);
 			}
+			
 			AttributeValue newValue = new AttributeValue(oldValue.attribute, att.type.canonize(value.second));
 			newValues.remove(oldValue);
 			newValues.add(newValue);
