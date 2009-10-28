@@ -176,7 +176,7 @@ class TransactionManagerImpl implements TransactionManager {
 		return transactionInfo != null ? transactionInfo : versionRef.get();
 	}
 	
-	private abstract class ValuesDelta {
+	private static abstract class ValuesDelta {
 		protected final Map<BaseRelation, BaseRelationInfo> relationInfo;
 
 		public ValuesDelta(Map<BaseRelation, BaseRelationInfo> relationInfo) {
@@ -184,7 +184,7 @@ class TransactionManagerImpl implements TransactionManager {
 		}
 	}
 	
-	private class TransactionInfo extends ValuesDelta {
+	private static class TransactionInfo extends ValuesDelta {
 		protected final Version version;
 		protected boolean rolledback;
 		
@@ -207,7 +207,7 @@ class TransactionManagerImpl implements TransactionManager {
 		}
 	}
 	
-	private class Version extends ValuesDelta {
+	private static class Version extends ValuesDelta {
 		protected final long id;
 		protected final AtomicReference<Version> previousRef;
 		protected final AtomicInteger transactionInfoCount = new AtomicInteger();
