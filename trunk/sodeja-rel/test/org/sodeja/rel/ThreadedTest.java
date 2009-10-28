@@ -10,12 +10,14 @@ public class ThreadedTest {
 	
 	private static class TestThread extends Thread {
 		private final Domain domain;
+		private final TransactionManager txm;
 		private final Range insertRange;
 		private final Range insertAnDeleteRange;
 		
 		public TestThread(String name, Domain domain, Range insertRange, Range insertAnDeleteRange) {
 			this.setName(name);
 			this.domain = domain;
+			this.txm = domain.txm();
 			this.insertRange = insertRange;
 			this.insertAnDeleteRange = insertAnDeleteRange;
 		}
@@ -31,42 +33,42 @@ public class ThreadedTest {
 			}
 			
 			for(Integer i : insertRange) {
-				domain.txm().begin();
+				txm.begin();
 				
 				domain.insertPlain("Department", 
 						"id", i, 
 						"name", "fairlyLongName", 
 						"manager", "fairlyLongManagerName");
 				
-				domain.txm().commit();
+				txm.commit();
 			}
 
 			for(Integer i : insertAnDeleteRange) {
-				domain.txm().begin();
+				txm.begin();
 
 				domain.insertPlain("Department", 
 						"id", i, 
 						"name", "fairlyLongName", 
 						"manager", "fairlyLongManagerName");
 				
-				domain.txm().commit();
+				txm.commit();
 
-				domain.txm().begin();
+				txm.begin();
 
 				domain.deletePlain("Department", "id", i); 
 
-				domain.txm().commit();
+				txm.commit();
 			}
 			
 			for(Integer i : insertRange) {
-				domain.txm().begin();
+				txm.begin();
 				
 				domain.insertPlain("Employee", 
 						"id", i, 
 						"name", "fairlyLongName", 
 						"department_id", i);
 				
-				domain.txm().commit();
+				txm.commit();
 			}
 			
 			System.out.println("Finished");

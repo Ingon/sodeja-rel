@@ -5,7 +5,7 @@ public class Attribute implements Comparable<Attribute> {
 	public final Type type;
 	
 	public Attribute(String name, Type type) {
-		this.name = name;
+		this.name = name.intern();
 		this.type = type;
 	}
 
@@ -20,12 +20,16 @@ public class Attribute implements Comparable<Attribute> {
 
 	@Override
 	public boolean equals(Object obj) {
+		if(obj == this) {
+			return true;
+		}
+		
 		if(! (obj instanceof Attribute)) {
 			return false;
 		}
 		
 		Attribute o = (Attribute) obj;
-		return name.equals(o.name) && type == o.type;
+		return name == o.name && type == o.type;
 	}
 
 	@Override

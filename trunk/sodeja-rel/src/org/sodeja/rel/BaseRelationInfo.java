@@ -1,6 +1,8 @@
 package org.sodeja.rel;
 
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -62,10 +64,8 @@ class BaseRelationInfo {
 	public final BaseRelationIndex pkIndex;
 	public final BaseRelationIndexes fkIndexes;
 	
-	public final PersistentSet<BaseRelationListener> listeners;
+	private final Set<BaseRelationListener> listeners;
 	
-//	public final Set<Entity> newSet;
-//	public final Set<Entity> deleteSet;
 	public final List<TransactionLogItem> txLog;
 	
 	public final Map<ForeignKey, Set<Entity>> starvingEntities; 
@@ -73,16 +73,14 @@ class BaseRelationInfo {
 	public BaseRelationInfo() {
 		this(new PersistentSet<Entity>(),
 				new BaseRelationIndex(new TreeSet<Attribute>()), new BaseRelationIndexes(),
-				new PersistentSet<BaseRelationListener>(),
-//				new HashSet<Entity>(), new HashSet<Entity>(),
+				new HashSet<BaseRelationListener>(),
 				new LinkedList<TransactionLogItem>(),
 				new HashMap<ForeignKey, Set<Entity>>());
 	}
 
-	public BaseRelationInfo(PersistentSet<Entity> entities, 
+	private BaseRelationInfo(PersistentSet<Entity> entities, 
 			BaseRelationIndex pkIndex, BaseRelationIndexes fkIndexes,
-			PersistentSet<BaseRelationListener> listeners,
-//			Set<Entity> newSet, Set<Entity> deleteSet, 
+			Set<BaseRelationListener> listeners,
 			List<TransactionLogItem> txLog,
 			Map<ForeignKey, Set<Entity>> starvedEntities) {
 
@@ -93,8 +91,6 @@ class BaseRelationInfo {
 		
 		this.listeners = listeners;
 		
-//		this.newSet = newSet;
-//		this.deleteSet = deleteSet;
 		this.txLog = txLog;
 		
 		this.starvingEntities = starvedEntities;
@@ -102,25 +98,27 @@ class BaseRelationInfo {
 	
 	public boolean hasChanges() {
 		return ! txLog.isEmpty();
-//		return ! (newSet.isEmpty() && deleteSet.isEmpty());
 	}
 	
 	protected BaseRelationInfo copyDelta(PersistentSet<Entity> entities, BaseRelationIndex pkIndex, BaseRelationIndexes fkIndexes) {
 		return new BaseRelationInfo(entities, pkIndex, fkIndexes, this.listeners, 
-//				this.newSet, this.deleteSet, this.starvingEntities);
 				this.txLog, this.starvingEntities);
 	}
 
 	public BaseRelationInfo clearCopy() {
 		return new BaseRelationInfo(entities, pkIndex, fkIndexes, this.listeners, 
-//				new HashSet<Entity>(), new HashSet<Entity>(), new HashMap<ForeignKey, Set<Entity>>());
 				new LinkedList<TransactionLogItem>(), new HashMap<ForeignKey, Set<Entity>>());
 	}
 
 	public BaseRelationInfo addListener(BaseRelationListener l) {
-		return new BaseRelationInfo(this.entities, this.pkIndex, this.fkIndexes, this.listeners.addValue(l), 
-//				this.newSet, this.deleteSet, this.starvingEntities);
+		Set<BaseRelationListener> nl = new HashSet<BaseRelationListener>(this.listeners);
+		nl.add(l);
+		return new BaseRelationInfo(this.entities, this.pkIndex, this.fkIndexes, nl, 
 				this.txLog, this.starvingEntities);
+	}
+	
+	public Set<BaseRelationListener> getListeners() {
+		return Collections.unmodifiableSet(this.listeners);
 	}
 	
 	public BaseRelationInfo addEntity(Entity e) {
@@ -129,7 +127,6 @@ class BaseRelationInfo {
 		BaseRelationIndex newPkIndex = pkIndex.insert(e);
 		BaseRelationIndexes newFkIndexes = fkIndexes.insert(e);
 		
-//		newSet.add(e);
 		txLog.add(new TransactionLogItem(TransactionAction.ADD, e));
 		
 		return copyDelta(newEntities, newPkIndex, newFkIndexes);
@@ -141,7 +138,6 @@ class BaseRelationInfo {
 		BaseRelationIndex newPkIndex = pkIndex.delete(e);
 		BaseRelationIndexes newFkIndexes = fkIndexes.delete(e);
 		
-//		deleteSet.add(e);
 		txLog.add(new TransactionLogItem(TransactionAction.REMOVE, e));
 		
 		return copyDelta(newEntities, newPkIndex, newFkIndexes);
@@ -176,7 +172,6 @@ class BaseRelationInfo {
 		}
 		
 		return new BaseRelationInfo(newEntities, newPkIndex, newFkIndexes, this.listeners, 
-//				this.newSet, this.deleteSet, this.starvingEntities);
 				this.txLog, this.starvingEntities);
 	}
 }

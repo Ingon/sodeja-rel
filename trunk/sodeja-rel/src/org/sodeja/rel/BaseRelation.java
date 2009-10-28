@@ -74,10 +74,10 @@ public class BaseRelation implements Relation, BaseRelationListener {
 		
 		Set<AttributeMapping> mappings = new HashSet<AttributeMapping>();
 		for(int i : Range.of(thisAttributes)) {
-			Attribute thisAtt = attributeFinder.execute(thisAttributes[i]);
+			Attribute thisAtt = attributesMap.get(thisAttributes[i]);
 			fkIndexAttributes.add(thisAtt);
 			
-			Attribute foreignAtt = target.attributeFinder.execute(foreignAttributes[i]);
+			Attribute foreignAtt = target.attributesMap.get(foreignAttributes[i]);
 			targetPkCandidate.add(foreignAtt);
 			
 			mappings.add(new AttributeMapping(thisAtt, foreignAtt));
@@ -108,7 +108,7 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	protected Set<Attribute> resolveAttributes(Set<String> attributeNames) {
 		Set<Attribute> atts = new TreeSet<Attribute>();
 		for(String name : attributeNames) {
-			Attribute att = attributeFinder.execute(name);
+			Attribute att = attributesMap.get(name);
 			if(att == null) {
 				throw new RuntimeException("Unknown attribute name: " + name);
 			}
@@ -127,7 +127,7 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	}
 
 	private void fireInserted(Entity e) {
-		for(BaseRelationListener l : getInfo().listeners) {
+		for(BaseRelationListener l : getInfo().getListeners()) {
 			l.inserted(this, e);
 		}
 	}
@@ -221,7 +221,7 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	}
 	
 	private void fireUpdated(Entity oe, Entity e) {
-		for(BaseRelationListener l : getInfo().listeners) {
+		for(BaseRelationListener l : getInfo().getListeners()) {
 			l.updated(this, oe, e);
 		}
 	}
@@ -325,7 +325,7 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	}
 	
 	private void fireDeleted(Entity e) {
-		for(BaseRelationListener l : getInfo().listeners) {
+		for(BaseRelationListener l : getInfo().getListeners()) {
 			l.deleted(this, e);
 		}
 	}
@@ -334,18 +334,34 @@ public class BaseRelation implements Relation, BaseRelationListener {
 		if(strict && (attributeValues.size() != attributes.size())) {
 			throw new RuntimeException("Expected values for all relation attributes");
 		}
-		return SetUtils.maps(attributeValues, new Function1<AttributeValue, Pair<String, Object>>() {
-				@Override
-				public AttributeValue execute(Pair<String, Object> p) {
-					Attribute att = attributeFinder.execute(p.first);
-					if(att == null) {
-						throw new RuntimeException("Unknown attribute name: " + p.first);
-					}
-					if(! att.type.accepts(p.second)) {
-						throw new ConstraintViolationException("Wrong type for " + p.first);
-					}
-					return new AttributeValue(att, att.type.canonize(p.second));
-				}});
+		
+		SortedSet<AttributeValue> result = new TreeSet<AttributeValue>();
+		for(Pair<String, Object> p : attributeValues) {
+			Attribute att = attributesMap.get(p.first);
+			if(att == null) {
+				throw new RuntimeException("Unknown attribute name: " + p.first);
+			}
+			
+			if(! att.type.accepts(p.second)) {
+				throw new ConstraintViolationException("Wrong type for " + p.first);
+			}
+			
+			result.add(new AttributeValue(att, att.type.canonize(p.second)));
+		}
+		return result;
+		
+//		return SetUtils.maps(attributeValues, new Function1<AttributeValue, Pair<String, Object>>() {
+//				@Override
+//				public AttributeValue execute(Pair<String, Object> p) {
+//					Attribute att = attributeFinder.execute(p.first);
+//					if(att == null) {
+//						throw new RuntimeException("Unknown attribute name: " + p.first);
+//					}
+//					if(! att.type.accepts(p.second)) {
+//						throw new ConstraintViolationException("Wrong type for " + p.first);
+//					}
+//					return new AttributeValue(att, att.type.canonize(p.second));
+//				}});
 	}
 
 	protected Entity selectByKey(Entity ent) {
@@ -383,12 +399,6 @@ public class BaseRelation implements Relation, BaseRelationListener {
 		domain.manager.set(this, newInfo);
 	}
 	
-	private Function1<Attribute, String> attributeFinder = new Function1<Attribute, String>() {
-		@Override
-		public Attribute execute(final String att) {
-			return attributesMap.get(att);
-		}};
-
 	// TODO checks are ineffective currently
 	public void integrityChecks() {
 		checkPrimaryKey();
