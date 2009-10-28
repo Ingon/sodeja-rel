@@ -7,9 +7,12 @@ public class IntegrityTests {
 	private static boolean log = false;
 
 	public static void main(String[] args) {
-		pkCheck(createDomain());
-		fkCheck(createDomain());
-		pkMulty(createDomain());
+		for(int i = 0; i < 1000; i++) {
+			pkCheck(createDomain());
+			fkCheck(createDomain());
+			pkMulty(createDomain());
+			fkMulty(createDomain());
+		}
 	}
 	
 	private static void pkCheck(Domain domain) {
@@ -126,8 +129,21 @@ public class IntegrityTests {
 	private static void pkMulty(final Domain domain) {
 		final AtomicInteger val = new AtomicInteger();
 		final class M implements Runnable {
+			private final boolean shouldFail;
+			public M(boolean shouldFail) {
+				this.shouldFail = shouldFail;
+			}
+
 			@Override
 			public void run() {
+				if(shouldFail) {
+					try {
+						Thread.sleep(100);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+				}
+				
 				domain.txm().begin();
 				
 				try {
@@ -147,32 +163,82 @@ public class IntegrityTests {
 					e.printStackTrace();
 				}
 				
-				domain.txm().commit();
+				if(shouldFail) {
+					expectFail(domain.txm(), "Department: Primary");
+				} else {
+					expectSucc(domain.txm());
+				}
 			}
 		};
 		
-		new Thread(new M()).start();
-		new Thread(new M()).start();
+		new Thread(new M(false)).start();
+		new Thread(new M(true)).start();
+	}
+	
+	private static final AtomicInteger val = new AtomicInteger();
+	private static void fkMulty(final Domain domain) {
+		final TransactionManager tx = domain.txm();
 		
-		try {
-			Thread.sleep(3000);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-		
-		if(domain.select("Department").size() != 1) {
-			throw new RuntimeException("Failed");
-		}
-		System.out.println("SEL: " + domain.select("Department"));
-		
-		domain.txm().begin();
+		tx.begin();
 		domain.insertPlain("Department", 
-				"id", 1, 
-				"name", "D" + val.getAndIncrement(), 
+				"id", 0, 
+				"name", "D0", 
 				"manager", "U0");
-		expectSucc(domain.txm());
+		expectSucc(tx);
+		String t = "" + val.getAndIncrement();
 		
-		System.out.println("SEL: " + domain.select("Department"));
+		new Thread("D:" + t) {
+			@Override
+			public void run() {
+				tx.begin();
+				
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				
+				domain.deletePlain("Department", "id", 0);
+
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				
+				tx.commit();
+			}}.start();
+
+		new Thread("E:" + t) {
+			@Override
+			public void run() {
+				try {
+					Thread.sleep(100);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				
+				tx.begin();
+				
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				
+				domain.insertPlain("Employee", 
+						"id", 0, 
+						"name", "E0", 
+						"department_id", 0);
+
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				
+				expectFail(tx, "Employee: Foreign");
+			}}.start();
 	}
 	
 	private static void fail() {
@@ -208,18 +274,18 @@ public class IntegrityTests {
 		Domain domain = new Domain();
 		domain.txm().begin();
 		
-		BaseRelation dep = domain.relation("Department", 
+		domain.relation("Department", 
 				new Attribute("id", Types.INT),
 				new Attribute("name", Types.STRING),
 				new Attribute("manager", Types.STRING)).
 				primaryKey("id");
 		
-		BaseRelation empl = domain.relation("Employee", 
+		domain.relation("Employee", 
 				new Attribute("id", Types.INT),
 				new Attribute("name", Types.STRING),
 				new Attribute("department_id", Types.INT)).
 				primaryKey("id").
-				foreignKey(dep, "department_id", "id");
+				foreignKey(domain.resolveBase("Department"), "department_id", "id");
 		
 		domain.txm().commit();
 		return domain;
