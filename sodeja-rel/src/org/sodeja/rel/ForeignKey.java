@@ -12,10 +12,23 @@ import org.sodeja.functional.Function1;
 public class ForeignKey {
 	protected final BaseRelation foreignRelation;
 	protected final Set<AttributeMapping> mappings;
+	private final Set<Attribute> sourceAttributesCache;
+	private final Set<Attribute> targetAttributesCache;
 	
 	public ForeignKey(BaseRelation foreignRelation, Set<AttributeMapping> mappings) {
 		this.foreignRelation = foreignRelation;
 		this.mappings = Collections.unmodifiableSet(mappings);
+		
+		this.sourceAttributesCache = CollectionUtils.map(mappings, new TreeSet<Attribute>(), new Function1<Attribute, AttributeMapping>() {
+			@Override
+			public Attribute execute(AttributeMapping p) {
+				return p.source;
+			}});
+		this.targetAttributesCache = CollectionUtils.map(mappings, new TreeSet<Attribute>(), new Function1<Attribute, AttributeMapping>() {
+			@Override
+			public Attribute execute(AttributeMapping p) {
+				return p.target;
+			}});
 	}
 
 	@Override
@@ -39,19 +52,21 @@ public class ForeignKey {
 	}
 	
 	public Set<Attribute> getSourceAttributes() {
-		return CollectionUtils.map(mappings, new TreeSet<Attribute>(), new Function1<Attribute, AttributeMapping>() {
-			@Override
-			public Attribute execute(AttributeMapping p) {
-				return p.source;
-			}});
+		return sourceAttributesCache;
+//		return CollectionUtils.map(mappings, new TreeSet<Attribute>(), new Function1<Attribute, AttributeMapping>() {
+//			@Override
+//			public Attribute execute(AttributeMapping p) {
+//				return p.source;
+//			}});
 	}
 
 	public Set<Attribute> getTargetAttributes() {
-		return CollectionUtils.map(mappings, new TreeSet<Attribute>(), new Function1<Attribute, AttributeMapping>() {
-			@Override
-			public Attribute execute(AttributeMapping p) {
-				return p.target;
-			}});
+		return targetAttributesCache;
+//		return CollectionUtils.map(mappings, new TreeSet<Attribute>(), new Function1<Attribute, AttributeMapping>() {
+//			@Override
+//			public Attribute execute(AttributeMapping p) {
+//				return p.target;
+//			}});
 	}
 
 	public Entity toTargetPk(final Entity source) {
