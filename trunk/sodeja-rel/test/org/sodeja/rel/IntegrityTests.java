@@ -1,5 +1,7 @@
 package org.sodeja.rel;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 
 public class IntegrityTests {
 	private static boolean log = false;
@@ -7,6 +9,7 @@ public class IntegrityTests {
 	public static void main(String[] args) {
 		pkCheck(createDomain());
 		fkCheck(createDomain());
+		pkMulty(createDomain());
 	}
 	
 	private static void pkCheck(Domain domain) {
@@ -120,6 +123,58 @@ public class IntegrityTests {
 		expectFail(tx, "Employee: Foreign");
 	}
 
+	private static void pkMulty(final Domain domain) {
+		final AtomicInteger val = new AtomicInteger();
+		final class M implements Runnable {
+			@Override
+			public void run() {
+				domain.txm().begin();
+				
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				
+				domain.insertPlain("Department", 
+						"id", 0, 
+						"name", "D" + val.getAndIncrement(), 
+						"manager", "U0");
+
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				
+				domain.txm().commit();
+			}
+		};
+		
+		new Thread(new M()).start();
+		new Thread(new M()).start();
+		
+		try {
+			Thread.sleep(3000);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+		
+		if(domain.select("Department").size() != 1) {
+			throw new RuntimeException("Failed");
+		}
+		System.out.println("SEL: " + domain.select("Department"));
+		
+		domain.txm().begin();
+		domain.insertPlain("Department", 
+				"id", 1, 
+				"name", "D" + val.getAndIncrement(), 
+				"manager", "U0");
+		expectSucc(domain.txm());
+		
+		System.out.println("SEL: " + domain.select("Department"));
+	}
+	
 	private static void fail() {
 		throw new RuntimeException("Test Failed");
 	}

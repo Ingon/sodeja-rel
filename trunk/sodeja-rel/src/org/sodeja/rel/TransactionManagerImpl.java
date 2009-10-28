@@ -49,8 +49,13 @@ class TransactionManagerImpl implements TransactionManager {
 			clearInfo(info);
 			return;
 		}
-		waitOtherTransactions(info);
 		
+		waitOtherTransactions(info);
+		commitTransaction(info);
+		clearInfo(info);
+	}
+
+	private void commitTransaction(TransactionInfo info) {
 		try {
 			domain.integrityCheck();
 		} catch(ConstraintViolationException exc) {
@@ -58,12 +63,6 @@ class TransactionManagerImpl implements TransactionManager {
 			throw exc;
 		}
 		
-		commitTransaction(info);
-		
-		clearInfo(info);
-	}
-
-	private void commitTransaction(TransactionInfo info) {
 		long verId = idGen.next();
 		boolean result = versionRef.compareAndSet(info.version, new Version(verId, info.relationInfo, info.version));
 		if(! result) {
@@ -72,7 +71,18 @@ class TransactionManagerImpl implements TransactionManager {
 				rollback();
 				throw new RollbackException("");
 			}
+			
 			Map<BaseRelation, BaseRelationInfo> relationInfo = merge(ver, info); // TODO here after merge we should again perform integrity checks!
+			try {
+				state.set(new TransactionInfo(info.version, relationInfo));
+				domain.integrityCheck();
+			} catch(ConstraintViolationException exc) {
+				state.set(info);
+				rollback();
+				throw exc;
+			}
+			state.set(info);
+			
 			Version newVersion = new Version(verId, relationInfo, ver);
 			result = versionRef.compareAndSet(ver, newVersion);
 			if(! result) {
@@ -190,6 +200,11 @@ class TransactionManagerImpl implements TransactionManager {
 		
 		public TransactionInfo(Version version) {
 			super(version.newRelationInfo());
+			this.version = version;
+		}
+		
+		public TransactionInfo(Version version, Map<BaseRelation, BaseRelationInfo> relationInfo) {
+			super(relationInfo);
 			this.version = version;
 		}
 		
