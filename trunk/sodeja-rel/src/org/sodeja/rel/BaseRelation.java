@@ -16,7 +16,6 @@ import org.sodeja.collections.SetUtils;
 import org.sodeja.functional.Function1;
 import org.sodeja.functional.Pair;
 import org.sodeja.functional.Predicate1;
-import org.sodeja.lang.IDGenerator;
 import org.sodeja.lang.ObjectUtils;
 import org.sodeja.lang.Range;
 
@@ -25,13 +24,11 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	protected final String name;
 	protected final Set<Attribute> attributes;
 	protected final Map<String, Attribute> attributesMap;
-	protected final IDGenerator idGen = new IDGenerator();
 	
+	// TODO move in info
 	protected Set<Attribute> pk;
 	protected final Set<ForeignKey> fks = new HashSet<ForeignKey>();
 	
-	protected final Set<BaseRelationListener> listeners = new HashSet<BaseRelationListener>();
-
 	protected BaseRelation(Domain domain, String name, Attribute... attributes) {
 		this.domain = domain;
 		this.name = name;
@@ -91,7 +88,7 @@ public class BaseRelation implements Relation, BaseRelationListener {
 		}
 		
 		fks.add(new ForeignKey(target, mappings));
-		target.listeners.add(this);
+		target.addListener(this);
 		
 		BaseRelationInfo info = getInfo();
 		setInfo(info.copyDelta(info.entities, info.pkIndex, info.fkIndexes.addIndex(new BaseRelationIndex(fkIndexAttributes))));
@@ -99,6 +96,11 @@ public class BaseRelation implements Relation, BaseRelationListener {
 		return this;
 	}
 
+	protected void addListener(BaseRelationListener l) {
+		BaseRelationInfo info = getInfo();
+		setInfo(info.addListener(l));
+	}
+	
 	private Set<Attribute> resolveAttributes(String... attributeNames) {
 		return resolveAttributes(SetUtils.asSet(attributeNames));
 	}
@@ -118,25 +120,20 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	public void insert(Set<Pair<String, Object>> attributeValues) {
 		Entity e = new Entity(extractValues(attributeValues, true));
 		
-		BaseRelationInfo currentInfo = getInfo();
+		setInfo(getInfo().addEntity(e));
 		
-		PersistentSet<Entity> entities = currentInfo.entities.addValue(e);
-		
-		BaseRelationIndex newPkIndex = currentInfo.pkIndex.insert(e);
-		BaseRelationIndexes newFkIndexes = currentInfo.fkIndexes.insert(e);
-		
-		currentInfo.newSet.add(e);
-		
-		setInfo(currentInfo.copyDelta(entities, newPkIndex, newFkIndexes));
-		
-		checkForeignKeys(currentInfo, e);
-		
-		for(BaseRelationListener l : listeners) {
+		checkForeignKeys(e);
+		fireInserted(e);
+	}
+
+	private void fireInserted(Entity e) {
+		for(BaseRelationListener l : getInfo().listeners) {
 			l.inserted(this, e);
 		}
 	}
-
-	private void removeFromStarving(BaseRelationInfo currentInfo, Entity e) {
+	
+	private void removeFromStarving(Entity e) {
+		BaseRelationInfo currentInfo = getInfo();
 		for(Iterator<Map.Entry<ForeignKey, Set<Entity>>> ite = currentInfo.starvingEntities.entrySet().iterator(); ite.hasNext(); ) {
 			Map.Entry<ForeignKey, Set<Entity>> en = ite.next();
 			Set<Entity> starvingIds = en.getValue();
@@ -149,7 +146,8 @@ public class BaseRelation implements Relation, BaseRelationListener {
 		}
 	}
 	
-	private void checkForeignKeys(BaseRelationInfo currentInfo, Entity e) {
+	private void checkForeignKeys(Entity e) {
+		BaseRelationInfo currentInfo = getInfo();
 		for(ForeignKey fk : fks) {
 			Set<Entity> pkIndex = fk.foreignRelation.getPkIndex().index();
 			Entity pk = fk.toTargetPk(e);
@@ -207,77 +205,39 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	}
 	
 	public void update(Condition cond, Set<Pair<String, Object>> attributeValues) {
-		BaseRelationInfo currentInfo = getInfo();
-		
-		PersistentSet<Entity> entities = currentInfo.entities;
-		
-		BaseRelationIndex newPkIndex = currentInfo.pkIndex;
-		BaseRelationIndexes newFkIndexes = currentInfo.fkIndexes;
-
-		for(Entity e : entities) {
+		for(Entity e : getInfo().entities) {
 			if(cond.satisfied(e)) {
-				entities = entities.removeValue(e);
+				setInfo(getInfo().removeEntity(e));
+				removeFromStarving(e);
 				
-				newPkIndex = newPkIndex.delete(e);
-				newFkIndexes = newFkIndexes.delete(e);
+				Entity ne = new Entity(merge(e, attributeValues));
 				
-				currentInfo.deleteSet.add(e);
+				setInfo(getInfo().addEntity(ne));
+				checkForeignKeys(ne);
 				
-				Entity oe = e;
-				e = new Entity(merge(e, attributeValues));
-				
-				entities = entities.addValue(e);
-				
-				newPkIndex = newPkIndex.insert(e);
-				newFkIndexes = newFkIndexes.insert(e);
-				
-				currentInfo.newSet.add(e);
-				
-				removeFromStarving(currentInfo, oe);
-				checkForeignKeys(currentInfo, e);
-				for(BaseRelationListener l : listeners) {
-					l.updated(this, oe, e);
-				}
+				fireUpdated(e, ne);
 			}
 		}
-		
-		setInfo(currentInfo.copyDelta(entities, newPkIndex, newFkIndexes));
+	}
+	
+	private void fireUpdated(Entity oe, Entity e) {
+		for(BaseRelationListener l : getInfo().listeners) {
+			l.updated(this, oe, e);
+		}
 	}
 	
 	private void updateAll(PersistentSet<Entity> targetEntities, Set<Pair<String, Object>> attributeValues) {
-		BaseRelationInfo currentInfo = getInfo();
-		
-		PersistentSet<Entity> entities = currentInfo.entities;
-		
-		BaseRelationIndex newPkIndex = currentInfo.pkIndex;
-		BaseRelationIndexes newFkIndexes = currentInfo.fkIndexes;
-
 		for(Entity e : targetEntities) {
-			entities = entities.removeValue(e);
+			setInfo(getInfo().removeEntity(e));
+			removeFromStarving(e);
 			
-			newPkIndex = newPkIndex.delete(e);
-			newFkIndexes = newFkIndexes.delete(e);
+			Entity ne = new Entity(merge(e, attributeValues));
 			
-			currentInfo.deleteSet.add(e);
+			setInfo(getInfo().addEntity(ne));
+			checkForeignKeys(ne);
 			
-			Entity oe = e;
-			e = new Entity(merge(e, attributeValues));
-			
-			entities = entities.addValue(e);
-			
-			newPkIndex = newPkIndex.insert(e);
-			newFkIndexes = newFkIndexes.insert(e);
-			
-			currentInfo.newSet.add(e);
-
-			removeFromStarving(currentInfo, oe);
-			checkForeignKeys(currentInfo, e);
-			for(BaseRelationListener l : listeners) {
-				l.updated(this, oe, e);
-			}
+			fireUpdated(e, ne);
 		}
-		
-		setInfo(currentInfo.copyDelta(entities, newPkIndex, newFkIndexes));
 	}
 
 	private SortedSet<AttributeValue> merge(Entity e, Set<Pair<String, Object>> attributeValues) {
@@ -346,55 +306,28 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	}
 
 	public void delete(Condition cond) {
-		BaseRelationInfo currentInfo = getInfo();
-		
-		PersistentSet<Entity> entities = currentInfo.entities;
-		
-		BaseRelationIndex newPkIndex = currentInfo.pkIndex;
-		BaseRelationIndexes newFkIndexes = currentInfo.fkIndexes;
-
+		PersistentSet<Entity> entities = getInfo().entities;
 		for(Entity e : entities) {
 			if(cond.satisfied(e)) {
-				entities = entities.removeValue(e);
-				
-				newPkIndex = newPkIndex.delete(e);
-				newFkIndexes = newFkIndexes.delete(e);
-				
-				currentInfo.deleteSet.add(e);
-				
-				removeFromStarving(currentInfo, e);
-				for(BaseRelationListener l : listeners) {
-					l.deleted(this, e);
-				}
+				setInfo(getInfo().removeEntity(e));
+				removeFromStarving(e);
+				fireDeleted(e);
 			}
 		}
-		
-		setInfo(currentInfo.copyDelta(entities, newPkIndex, newFkIndexes));
 	}
 
 	private void deleteAll(Set<Entity> targetEntities) {
-		BaseRelationInfo currentInfo = getInfo();
-		
-		PersistentSet<Entity> entities = currentInfo.entities;
-		
-		BaseRelationIndex newPkIndex = currentInfo.pkIndex;
-		BaseRelationIndexes newFkIndexes = currentInfo.fkIndexes;
-
 		for(Entity e : targetEntities) {
-			entities = entities.removeValue(e);
-			
-			newPkIndex = newPkIndex.delete(e);
-			newFkIndexes = newFkIndexes.delete(e);
-			
-			currentInfo.deleteSet.add(e);
-			
-			removeFromStarving(currentInfo, e);
-			for(BaseRelationListener l : listeners) {
-				l.deleted(this, e);
-			}
+			setInfo(getInfo().removeEntity(e));
+			removeFromStarving(e);
+			fireDeleted(e);
 		}
-		
-		setInfo(currentInfo.copyDelta(entities, newPkIndex, newFkIndexes));
+	}
+	
+	private void fireDeleted(Entity e) {
+		for(BaseRelationListener l : getInfo().listeners) {
+			l.deleted(this, e);
+		}
 	}
 	
 	private SortedSet<AttributeValue> extractValues(Set<Pair<String, Object>> attributeValues, boolean strict) {

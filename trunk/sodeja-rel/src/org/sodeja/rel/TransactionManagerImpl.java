@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -37,6 +38,8 @@ class TransactionManagerImpl implements TransactionManager {
 		return;
 	}
 	
+	private AtomicBoolean comitting = new AtomicBoolean();
+	
 	public void commit() {
 		TransactionInfo info = state.get();
 		if(info == null) {
@@ -51,8 +54,16 @@ class TransactionManagerImpl implements TransactionManager {
 		}
 		
 		waitOtherTransactions(info);
-		commitTransaction(info);
-		clearInfo(info);
+		if(comitting.get()) {
+			throw new RuntimeException("!!!!!!!!!!!");
+		}
+		try {
+			comitting.set(true);
+			commitTransaction(info);
+		} finally {
+			comitting.set(false);
+			clearInfo(info);
+		}
 	}
 
 	private void commitTransaction(TransactionInfo info) {
@@ -149,13 +160,19 @@ class TransactionManagerImpl implements TransactionManager {
 	}
 	
 	private Map<BaseRelation, BaseRelationInfo> merge(Version ver, TransactionInfo info) {
-		Map<BaseRelation, BaseRelationInfo> mergedInfo = new HashMap<BaseRelation, BaseRelationInfo>(info.relationInfo);
+		if(ver == info.version) {
+			return info.relationInfo;
+		}
+		
+		Map<BaseRelation, BaseRelationInfo> oldMergedInfo = merge(ver.previousRef.get(), info);
+		Map<BaseRelation, BaseRelationInfo> mergedInfo = new HashMap<BaseRelation, BaseRelationInfo>(oldMergedInfo);
 		for(BaseRelation r : ver.relationInfo.keySet()) {
 			BaseRelationInfo versionInfo = ver.relationInfo.get(r);
-			BaseRelationInfo threadInfo = info.relationInfo.get(r);
+			BaseRelationInfo threadInfo = oldMergedInfo.get(r);
 			
-			mergedInfo.put(r, versionInfo.merge(threadInfo));
+			mergedInfo.put(r, threadInfo.merge(r, versionInfo));
 		}
+		
 		return mergedInfo;
 	}
 
