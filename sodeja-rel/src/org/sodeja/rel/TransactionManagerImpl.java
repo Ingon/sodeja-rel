@@ -1,14 +1,15 @@
 package org.sodeja.rel;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.sodeja.lang.IDGenerator;
+import org.sodeja.rel.BaseRelationInfo.TransactionLogItem;
 
 class TransactionManagerImpl implements TransactionManager {
 	private final Domain domain;
@@ -143,14 +144,14 @@ class TransactionManagerImpl implements TransactionManager {
 	}
 
 	private boolean checkDiff(Map<BaseRelation, BaseRelationInfo> target, Map<BaseRelation, BaseRelationInfo> current) {
-		for(Map.Entry<BaseRelation, BaseRelationInfo> c : current.entrySet()) {
-			Set<Entity> tdelta = target.get(c.getKey()).deleteSet;
+		for(Map.Entry<BaseRelation, BaseRelationInfo> c : current.entrySet()) { // TODO
+			List<TransactionLogItem> tdelta = target.get(c.getKey()).txLog;
 			if(tdelta == null) {
 				continue;
 			}
 			
-			Set<Entity> cdelta = c.getValue().deleteSet;
-			for(Entity id : cdelta) {
+			List<TransactionLogItem> cdelta = c.getValue().txLog;
+			for(TransactionLogItem id : cdelta) {
 				if(tdelta.contains(id)) {
 					return true;
 				}
