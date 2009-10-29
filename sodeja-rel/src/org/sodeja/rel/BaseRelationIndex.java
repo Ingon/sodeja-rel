@@ -1,7 +1,5 @@
 package org.sodeja.rel;
 
-import java.util.AbstractSet;
-import java.util.Iterator;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
@@ -83,9 +81,6 @@ class BaseRelationIndex {
 		return index.keySet();
 	}
 
-	public Iterable<Entity> values() {
-	}
-	
 	@Override
 	public boolean equals(Object obj) {
 		if(! (obj instanceof BaseRelationIndex)) {
