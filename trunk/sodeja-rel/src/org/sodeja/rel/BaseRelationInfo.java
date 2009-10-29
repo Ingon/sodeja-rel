@@ -9,6 +9,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
+import org.sodeja.collections.PersistentSet;
+
 class BaseRelationInfo {
 	private static enum TransactionAction {
 		ADD,
@@ -57,7 +59,7 @@ class BaseRelationInfo {
 		}
 	}
 	
-//	public final PersistentSet<Entity> entities;
+	public final PersistentSet<Entity> entities;
 	
 	public final BaseRelationIndex pkIndex;
 	public final BaseRelationIndexes fkIndexes;
@@ -69,20 +71,20 @@ class BaseRelationInfo {
 	public final Map<ForeignKey, Set<Entity>> starvingEntities; 
 	
 	public BaseRelationInfo() {
-		this(//new PersistentSet<Entity>(),
+		this(new PersistentSet<Entity>(),
 				new BaseRelationIndex(new TreeSet<Attribute>()), new BaseRelationIndexes(),
 				new HashSet<BaseRelationListener>(),
 				new LinkedList<TransactionLogItem>(),
 				new HashMap<ForeignKey, Set<Entity>>());
 	}
 
-	private BaseRelationInfo(//PersistentSet<Entity> entities, 
+	private BaseRelationInfo(PersistentSet<Entity> entities, 
 			BaseRelationIndex pkIndex, BaseRelationIndexes fkIndexes,
 			Set<BaseRelationListener> listeners,
 			List<TransactionLogItem> txLog,
 			Map<ForeignKey, Set<Entity>> starvedEntities) {
 
-//		this.entities = entities;
+		this.entities = entities;
 		
 		this.pkIndex = pkIndex;
 		this.fkIndexes = fkIndexes;
@@ -98,27 +100,20 @@ class BaseRelationInfo {
 		return ! txLog.isEmpty();
 	}
 	
-//	protected BaseRelationInfo copyDelta(PersistentSet<Entity> entities, BaseRelationIndex pkIndex, BaseRelationIndexes fkIndexes) {
-//		return new BaseRelationInfo(entities, pkIndex, fkIndexes, this.listeners, 
-//				this.txLog, this.starvingEntities);
-	protected BaseRelationInfo copyDelta(BaseRelationIndex pkIndex, BaseRelationIndexes fkIndexes) {
-		return new BaseRelationInfo(pkIndex, fkIndexes, this.listeners, 
+	protected BaseRelationInfo copyDelta(PersistentSet<Entity> entities, BaseRelationIndex pkIndex, BaseRelationIndexes fkIndexes) {
+		return new BaseRelationInfo(entities, pkIndex, fkIndexes, this.listeners, 
 				this.txLog, this.starvingEntities);
 	}
 
 	public BaseRelationInfo clearCopy() {
-//		return new BaseRelationInfo(entities, pkIndex, fkIndexes, this.listeners, 
-//				new LinkedList<TransactionLogItem>(), new HashMap<ForeignKey, Set<Entity>>());
-		return new BaseRelationInfo(pkIndex, fkIndexes, this.listeners, 
+		return new BaseRelationInfo(entities, pkIndex, fkIndexes, this.listeners, 
 				new LinkedList<TransactionLogItem>(), new HashMap<ForeignKey, Set<Entity>>());
 	}
 
 	public BaseRelationInfo addListener(BaseRelationListener l) {
 		Set<BaseRelationListener> nl = new HashSet<BaseRelationListener>(this.listeners);
 		nl.add(l);
-//		return new BaseRelationInfo(this.entities, this.pkIndex, this.fkIndexes, nl, 
-//				this.txLog, this.starvingEntities);
-		return new BaseRelationInfo(this.pkIndex, this.fkIndexes, nl, 
+		return new BaseRelationInfo(this.entities, this.pkIndex, this.fkIndexes, nl, 
 				this.txLog, this.starvingEntities);
 	}
 	
@@ -127,38 +122,36 @@ class BaseRelationInfo {
 	}
 	
 	public BaseRelationInfo addEntity(Entity e) {
-//		PersistentSet<Entity> newEntities = entities.addValue(e);
+		PersistentSet<Entity> newEntities = entities.addValue(e);
 		
 		BaseRelationIndex newPkIndex = pkIndex.insert(e);
 		BaseRelationIndexes newFkIndexes = fkIndexes.insert(e);
 		
 		txLog.add(new TransactionLogItem(TransactionAction.ADD, e));
 		
-//		return copyDelta(newEntities, newPkIndex, newFkIndexes);
-		return copyDelta(newPkIndex, newFkIndexes);
+		return copyDelta(newEntities, newPkIndex, newFkIndexes);
 	}
 	
 	public BaseRelationInfo removeEntity(Entity e) {
-//		PersistentSet<Entity> newEntities = entities.removeValue(e);
+		PersistentSet<Entity> newEntities = entities.removeValue(e);
 		
 		BaseRelationIndex newPkIndex = pkIndex.delete(e);
 		BaseRelationIndexes newFkIndexes = fkIndexes.delete(e);
 		
 		txLog.add(new TransactionLogItem(TransactionAction.REMOVE, e));
 		
-//		return copyDelta(newEntities, newPkIndex, newFkIndexes);
-		return copyDelta(newPkIndex, newFkIndexes);
+		return copyDelta(newEntities, newPkIndex, newFkIndexes);
 	}
 	
 	protected BaseRelationInfo merge(BaseRelation relation, BaseRelationInfo versionInfo) {
-//		PersistentSet<Entity> newEntities = entities;
+		PersistentSet<Entity> newEntities = entities;
 		BaseRelationIndex newPkIndex = pkIndex;
 		BaseRelationIndexes newFkIndexes = fkIndexes;
 		
 		for(TransactionLogItem item : versionInfo.txLog) {
 			Entity e = item.e;
 			if(item.action == TransactionAction.ADD) {
-//				newEntities = newEntities.addValue(e);
+				newEntities = newEntities.addValue(e);
 				
 				newPkIndex = newPkIndex.insert(e);
 				newFkIndexes = newFkIndexes.insert(e);
@@ -167,7 +160,7 @@ class BaseRelationInfo {
 					l.inserted(relation, e);
 				}
 			} else {
-//				newEntities = newEntities.removeValue(e);
+				newEntities = newEntities.removeValue(e);
 				
 				newPkIndex = newPkIndex.delete(e);
 				newFkIndexes = newFkIndexes.delete(e);
@@ -178,13 +171,7 @@ class BaseRelationInfo {
 			}
 		}
 		
-//		return new BaseRelationInfo(newEntities, newPkIndex, newFkIndexes, this.listeners, 
-//				this.txLog, this.starvingEntities);
-		return new BaseRelationInfo(newPkIndex, newFkIndexes, this.listeners, 
+		return new BaseRelationInfo(newEntities, newPkIndex, newFkIndexes, this.listeners, 
 				this.txLog, this.starvingEntities);
-	}
-	
-	public Iterable<Entity> getEntities() {
-		return pkIndex.values();
 	}
 }
