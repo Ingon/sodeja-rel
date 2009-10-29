@@ -1,10 +1,10 @@
 package org.sodeja.rel;
 
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -38,8 +38,6 @@ class TransactionManagerImpl implements TransactionManager {
 		order.offer(newInfo);
 		return;
 	}
-	
-	private AtomicBoolean comitting = new AtomicBoolean();
 	
 	public void commit() {
 		TransactionInfo info = state.get();
@@ -156,20 +154,26 @@ class TransactionManagerImpl implements TransactionManager {
 	}
 	
 	private Map<BaseRelation, BaseRelationInfo> merge(Version ver, TransactionInfo info) {
-		if(ver == info.version) {
-			return info.relationInfo;
+		LinkedList<Version> versions = new LinkedList<Version>();
+		Version currentVersion = ver;
+		while(currentVersion != info.version) {
+			versions.addFirst(currentVersion);
+			currentVersion = currentVersion.previousRef.get();
 		}
 		
-		Map<BaseRelation, BaseRelationInfo> oldMergedInfo = merge(ver.previousRef.get(), info);
-		Map<BaseRelation, BaseRelationInfo> mergedInfo = new HashMap<BaseRelation, BaseRelationInfo>(oldMergedInfo);
-		for(BaseRelation r : ver.relationInfo.keySet()) {
-			BaseRelationInfo versionInfo = ver.relationInfo.get(r);
-			BaseRelationInfo threadInfo = oldMergedInfo.get(r);
-			
-			mergedInfo.put(r, threadInfo.merge(r, versionInfo));
+		Map<BaseRelation, BaseRelationInfo> currentInfo = info.relationInfo;
+		for(Version current : versions) {
+			Map<BaseRelation, BaseRelationInfo> mergedInfo = new HashMap<BaseRelation, BaseRelationInfo>(currentInfo);
+			for(BaseRelation r : current.relationInfo.keySet()) {
+				BaseRelationInfo versionInfo = current.relationInfo.get(r);
+				BaseRelationInfo threadInfo = currentInfo.get(r);
+				
+				mergedInfo.put(r, threadInfo.merge(r, versionInfo));
+			}
+			currentInfo = mergedInfo;
 		}
 		
-		return mergedInfo;
+		return currentInfo;
 	}
 
 	public void rollback() {
