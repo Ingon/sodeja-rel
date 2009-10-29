@@ -44,13 +44,15 @@ public class BaseRelation implements Relation, BaseRelationListener {
 		
 		BaseRelationInfo info = getInfo(); // By default whole attribute set is the PK
 		pk = this.attributes;
-		setInfo(info.copyDelta(info.entities, new BaseRelationIndex(pk), info.fkIndexes));
+//		setInfo(info.copyDelta(info.entities, new BaseRelationIndex(pk), info.fkIndexes));
+		setInfo(info.copyDelta(new BaseRelationIndex(pk), info.fkIndexes));
 	}
 	
 	public BaseRelation primaryKey(String... attributeNames) {
 		pk = resolveAttributes(attributeNames);
 		BaseRelationInfo info = getInfo();
-		setInfo(info.copyDelta(info.entities, new BaseRelationIndex(pk), info.fkIndexes));
+//		setInfo(info.copyDelta(info.entities, new BaseRelationIndex(pk), info.fkIndexes));
+		setInfo(info.copyDelta(new BaseRelationIndex(pk), info.fkIndexes));
 		
 		return this;
 	}
@@ -91,7 +93,8 @@ public class BaseRelation implements Relation, BaseRelationListener {
 		target.addListener(this);
 		
 		BaseRelationInfo info = getInfo();
-		setInfo(info.copyDelta(info.entities, info.pkIndex, info.fkIndexes.addIndex(new BaseRelationIndex(fkIndexAttributes))));
+//		setInfo(info.copyDelta(info.entities, info.pkIndex, info.fkIndexes.addIndex(new BaseRelationIndex(fkIndexAttributes))));
+		setInfo(info.copyDelta(info.pkIndex, info.fkIndexes.addIndex(new BaseRelationIndex(fkIndexAttributes))));
 		
 		return this;
 	}
@@ -205,7 +208,7 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	}
 	
 	public void update(Condition cond, Set<Pair<String, Object>> attributeValues) {
-		for(Entity e : getInfo().entities) {
+		for(Entity e : getInfo().getEntities()) {
 			if(cond.satisfied(e)) {
 				setInfo(getInfo().removeEntity(e));
 				removeFromStarving(e);
@@ -306,8 +309,7 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	}
 
 	public void delete(Condition cond) {
-		PersistentSet<Entity> entities = getInfo().entities;
-		for(Entity e : entities) {
+		for(Entity e : getInfo().getEntities()) {
 			if(cond.satisfied(e)) {
 				setInfo(getInfo().removeEntity(e));
 				removeFromStarving(e);
@@ -365,7 +367,7 @@ public class BaseRelation implements Relation, BaseRelationListener {
 	}
 
 	protected Entity selectByKey(Entity ent) {
-		OUTER: for(Entity e : getInfo().entities) {
+		OUTER: for(Entity e : getInfo().getEntities()) {
 			for(AttributeValue pkVal : ent.getValues()) {
 				Object eval = e.getValue(pkVal.attribute.name);
 				if(! ObjectUtils.equalsIfNull(pkVal.value, eval)) {

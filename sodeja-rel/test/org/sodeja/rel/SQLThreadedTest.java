@@ -1,13 +1,10 @@
 package org.sodeja.rel;
 
 import java.sql.Connection;
-import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.util.Iterator;
 
-import org.sodeja.collections.SetUtils;
 import org.sodeja.lang.Range;
 
 public class SQLThreadedTest {
@@ -80,12 +77,17 @@ public class SQLThreadedTest {
 	
 	public static void main(String[] args) throws Exception {
 //		System.setProperty("derby.system.home", "file://d:/temp");
-		Class.forName("org.apache.derby.jdbc.EmbeddedDriver");
-//		Class.forName("org.postgresql.Driver");
+//		Class.forName("org.apache.derby.jdbc.EmbeddedDriver");
+		Class.forName("org.postgresql.Driver");
 		
-		Connection ccon = DriverManager.getConnection("jdbc:derby:DepartmentTest;create=true");
-		ccon.createStatement().execute("create table departments (id INTEGER NOT NULL PRIMARY KEY, name varchar(255), manager varchar(255))");
-		ccon.createStatement().execute("create table employees (id INTEGER NOT NULL PRIMARY KEY, name varchar(255), department_id INTEGER REFERENCES departments(id))");
+//		Connection ccon = DriverManager.getConnection("jdbc:derby:DepartmentTest;create=true");
+//		ccon.createStatement().execute("create table departments (id INTEGER NOT NULL PRIMARY KEY, name varchar(255), manager varchar(255))");
+//		ccon.createStatement().execute("create table employees (id INTEGER NOT NULL PRIMARY KEY, name varchar(255), department_id INTEGER REFERENCES departments(id))");
+//		ccon.close();
+		
+		Connection ccon = DriverManager.getConnection("jdbc:postgresql://localhost:5432/department_test", "worg", "worg");
+		ccon.createStatement().execute("delete from employees");
+		ccon.createStatement().execute("delete from departments");
 		ccon.close();
 		
 		TestThread[] threads = new TestThread[10];
@@ -94,8 +96,8 @@ public class SQLThreadedTest {
 		
 		for(Integer i : Range.of(threads)) {
 //			Connection connection = DriverManager.getConnection("jdbc:derby:DepartmentTest;user=dbuser;password=dbuserpwd");
-			Connection connection = DriverManager.getConnection("jdbc:derby:DepartmentTest;");
-//			Connection connection = DriverManager.getConnection("jdbc:postgresql://localhost:5432/department_test", "worg", "worg");
+//			Connection connection = DriverManager.getConnection("jdbc:derby:DepartmentTest;");
+			Connection connection = DriverManager.getConnection("jdbc:postgresql://localhost:5432/department_test", "worg", "worg");
 			connection.setAutoCommit(false);
 			threads[i] = new TestThread("TH" + i, connection, new Range(i * sz, (i + 1) * sz), new Range(delBase + i * sz, delBase + (i + 1) * sz));
 			threads[i].start();
