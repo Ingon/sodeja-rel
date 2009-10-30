@@ -14,4 +14,7 @@ class TransactionManagerImpl implements TransactionManager {
 	@Override
 	public void rollback() {
 	}
+
+	protected void execute() {
+	}
 }

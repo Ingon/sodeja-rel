@@ -10,9 +10,9 @@ import org.sodeja.rel.Relation;
 import org.sodeja.rel.TransactionManager;
 
 public class DomainImpl implements Domain {
-	private final TransactionManager txManager;
-	private final Map<String, BaseRelation> baseRelations;
-	private final Map<String, DerivedRelation> derivedRelations;
+	protected final TransactionManagerImpl txManager;
+	protected final Map<String, BaseRelation> baseRelations;
+	protected final Map<String, DerivedRelation> derivedRelations;
 
 	public DomainImpl() {
 		txManager = new TransactionManagerImpl();
@@ -27,7 +27,7 @@ public class DomainImpl implements Domain {
 
 	@Override
 	public BaseRelation newBaseRelation(String name) {
-		BaseRelationImpl baseRelation = new BaseRelationImpl(name);
+		BaseRelationImpl baseRelation = new BaseRelationImpl(this, name);
 		baseRelations.put(name, baseRelation);
 		return baseRelation;
 	}

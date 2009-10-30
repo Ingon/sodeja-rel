@@ -60,6 +60,15 @@ class TupleImpl implements Tuple {
 		throw new RuntimeException("Attribute " + name + " not present");
 	}
 	
+	protected AttributeValue getAttributeValue(Attribute att) {
+		for(AttributeValue v : values) {
+			if(v.attribute.equals(att)) {
+				return v;
+			}
+		}
+		throw new RuntimeException("Attribute " + att.name + " not present");
+	}
+	
 	@Override
 	public boolean equals(Object obj) {
 		if(this == obj) {
